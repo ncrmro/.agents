@@ -1,81 +1,119 @@
 # Shared agent configuration
 
-This repository is the canonical development checkout for project-agnostic agent configuration currently consumed as an Outfitter `.outfitter/` directory. Reusable profiles and operating rules here MUST NOT depend on any consuming project.
+This repository is the canonical, project-agnostic composition layer for shared agent roles and Outfitter development resources. Consuming repositories use it as an Outfitter settings source; they keep their own domain context, skills, and operating rules locally.
 
 ## Transitional architecture
 
-Outfitter currently authors and loads profiles from `.outfitter/`. Open Outfitter RFC [ai-outfitter/outfitter#165](https://github.com/ai-outfitter/outfitter/issues/165) proposes replacing profile-era `.outfitter` configuration with the Dotagents `.agents` protocol, including `~/.agents/` as the global layer and `<project>/.agents/` as the workspace overlay. The RFC is not yet the released standard.
+Outfitter currently authors and loads profiles from `.outfitter/`. Open RFC [ai-outfitter/outfitter#165](https://github.com/ai-outfitter/outfitter/issues/165) proposes replacing profile-era `.outfitter` configuration with the Dotagents `.agents` protocol, including `~/.agents/` as the global layer and `<project>/.agents/` as the workspace overlay. The RFC is not yet the released standard.
 
-Until that refactor lands, this repository keeps the profile-era layout at its root. Consumer projects should commit a small `.outfitter/settings.yml` selecting either a pinned remote revision or, when every environment follows the standardized workspace layout, this live checkout by relative path. A pinned remote consumer may use machine-private `.outfitter/local/settings.yml` to replace the remote with a live local checkout. These patterns avoid copying profiles into consumers.
+Until that refactor lands, this repository provides two equivalent source graphs:
+
+1. `settings.yml` pins published GitHub revisions for portable consumers and CI.
+2. Ignored `local/settings.yml` replaces those sources with live local checkouts for development.
+
+A consumer pins this repository's `settings.yml` as remote settings, then symlinks the ignored local settings file when it wants live edits. Outfitter's project-local settings layer replaces `profile_sources` as a whole, so the live graph cleanly overrides the published graph.
 
 ## Scope and portability
 
-Changes in this repository MUST be project-agnostic:
+Committed changes in this repository MUST be project-agnostic:
 
-- Do not hardcode a consuming project, company, customer, deployment, domain taxonomy, or machine-specific consumer path. The canonical checkout path documented below is the sole local-development convention.
-- Keep project-specific context in that project's `AGENTS.md`, `.agents/skills/`, documentation, or other project-owned files.
-- Define roles by reusable responsibilities and outcomes rather than one repository's current architecture.
-- Do not commit credentials, tokens, auth state, sessions, transcripts, caches, generated system prompts, or machine-specific absolute paths.
-- Prefer portable relative paths and documented environment variables over assumptions about one workstation.
-- Treat current profile files as transitional artifacts that will need deliberate migration if RFC #165 is implemented.
+- Do not hardcode a consuming project, company, customer, deployment, domain taxonomy, or machine-specific consumer path.
+- Keep project-specific context in the consumer's `AGENTS.md`, `.agents/skills/`, documentation, or other project-owned files.
+- Define roles by reusable responsibilities and outcomes.
+- Do not commit credentials, tokens, auth state, sessions, transcripts, caches, generated prompts, or machine-specific absolute paths.
+- Keep machine paths in ignored `local/settings.yml`; keep published sources and reviewed refs in committed `settings.yml`.
+- Treat profile-era files as transitional artifacts requiring deliberate migration if RFC #165 is implemented.
 
-Consuming repositories are test environments, not sources of shared policy. Improvements discovered while working in one project must be generalized before they are committed here.
+Consuming repositories are test environments, not sources of shared policy. Generalize improvements before committing them here.
+
+## Source graph
+
+Sources are ordered from lowest to highest precedence. Later sources override or compose over same-ID resources from earlier sources.
+
+| Source | Published catalog root | Typical local source | Resources used here |
+| --- | --- | --- | --- |
+| `ai-outfitter/default-profiles` | `profiles/` | `~/repos/unsupervised/ai-outfitters/default-profiles/profiles` | Default roles and `pyramid-principle` |
+| `ai-outfitter/community-profiles` | `profiles/` | `~/repos/unsupervised/ai-outfitters/community-profiles/profiles` | Community roles such as `github-actions` |
+| `ai-outfitter/outfitter` | `.outfitter/` on current main | Checkout-dependent; this machine's development branch publishes from `code/cli/` | Local `outfitter` skill |
+| `ai-outfitter/actions` | `.outfitter/` | Primary checkout or a clean main worktree's `.outfitter/` | `outfitter-actions` skill |
+| `ncrmro/.agents` | `profiles/` | `~/repos/ncrmro/.agents/profiles` | Highest-precedence shared roles |
+
+The `founder` profile selects the local `outfitter` skill. The actions source is present for `outfitter-actions` development, but the checked-out skill currently uses glob references that Outfitter 0.10.0 cannot materialize. Select it in a profile only when validating with a compatible Outfitter checkout or release.
 
 ## Repository layout
 
-- `settings.yml` selects the default profile and local profile source.
-- `profiles/` contains reusable role profiles.
-- `AGENTS.md` defines repository maintenance and local-development conventions.
-- Generated `*.generated-system-prompt.md` files are local validation artifacts and are ignored.
+- `settings.yml` defines the portable, pinned remote source graph.
+- `profiles/` contains project-agnostic roles owned by this repository.
+- `local/settings.yml` is ignored machine state containing the equivalent live source graph.
+- `AGENTS.md` defines maintenance and environment conventions.
+- `*.generated-system-prompt.md` files are ignored validation artifacts.
 
-## Standard local setup
+## Standard checkout layout
 
-Use the same workspace layout on each development machine:
+Use this layout on development machines:
 
 ```text
 ~/repos/
-  <owner>/
-    .agents/                 # this repository
-  <organization>/
-    <project>/               # consuming repository
+  ncrmro/
+    .agents/
+  unsupervised/
+    ai-outfitters/
+      actions/
+      community-profiles/
+      default-profiles/
+      outfitter/
+    worktrees/
+      actions/
+        main/                 # optional when actions/ is on another branch
+  <consumer-owner>/
+    <consumer-project>/
 ```
 
-Clone the canonical repository:
+Clone missing repositories:
 
 ```bash
-mkdir -p "$HOME/repos/ncrmro"
-git clone git@github.com:ncrmro/.agents.git "$HOME/repos/ncrmro/.agents"
+mkdir -p "$HOME/repos/ncrmro" "$HOME/repos/unsupervised/ai-outfitters"
+git clone git@github.com:ncrmro/.agents.git \
+  "$HOME/repos/ncrmro/.agents"
+git clone git@github.com:ai-outfitter/actions.git \
+  "$HOME/repos/unsupervised/ai-outfitters/actions"
+git clone git@github.com:ai-outfitter/community-profiles.git \
+  "$HOME/repos/unsupervised/ai-outfitters/community-profiles"
+git clone git@github.com:ai-outfitter/default-profiles.git \
+  "$HOME/repos/unsupervised/ai-outfitters/default-profiles"
+git clone git@github.com:ai-outfitter/outfitter.git \
+  "$HOME/repos/unsupervised/ai-outfitters/outfitter"
 ```
 
-### Committed consumer configuration
+Do not switch or reset a checkout containing unrelated work. If a published resource is absent from the current branch, create a clean worktree instead. For example:
 
-A consuming project SHOULD commit `.outfitter/settings.yml` with a reviewed remote source pinned to a tag or commit:
+```bash
+actions="$HOME/repos/unsupervised/ai-outfitters/actions"
+actions_main="$HOME/repos/unsupervised/worktrees/actions/main"
+mkdir -p "$(dirname "$actions_main")"
+git -C "$actions" fetch origin
+git -C "$actions" worktree add "$actions_main" main
+git -C "$actions_main" merge --ff-only origin/main
+```
+
+If `main` is already checked out elsewhere, point the local source graph at that checkout instead of creating a duplicate worktree.
+
+## Portable consumer configuration
+
+A consuming project SHOULD commit `.outfitter/settings.yml` that pins this repository's published settings:
 
 ```yaml
 default_profile: founder
-profile_sources:
+profile_export: false
+remote_settings:
   - github: ncrmro/.agents
-    ref: <reviewed-tag-or-commit>
-    path: profiles
+    ref: <reviewed-commit>
+    path: settings.yml
 ```
 
-Public GitHub repositories work directly. Private GitHub catalogs require the documented Outfitter Enterprise opt-in in the user's `~/.outfitter/settings.yml`. Do not place credentials in project settings.
+This repository is public, so Outfitter can sync it and the public `ai-outfitter/*` catalogs without private-catalog configuration. After changing `settings.yml` or shared profiles, push this repository and bump the consumer's reviewed commit.
 
-### Workspace-coupled direct source
-
-A consuming project MAY instead commit a direct relative source when contributors and automation use the standardized workspace layout:
-
-```yaml
-default_profile: founder
-profile_export: true
-profile_sources:
-  # Resolved relative to .outfitter/settings.yml.
-  - path: ../../../<owner>/.agents/profiles
-```
-
-This loads edits from the canonical checkout immediately and does not require a project-local override. It is intentionally workspace-coupled: CI and other machines must clone this repository at the documented sibling path before invoking Outfitter. Use the pinned remote pattern when that layout cannot be guaranteed.
-
-The consumer SHOULD ignore only machine-private state, not the whole `.outfitter` directory:
+The consumer SHOULD ignore only machine-private state:
 
 ```gitignore
 # .outfitter/.gitignore
@@ -83,53 +121,68 @@ The consumer SHOULD ignore only machine-private state, not the whole `.outfitter
 *.generated-system-prompt.md
 ```
 
-### Machine-local live override
+## Live local source graph
 
-For live profile development, create `.outfitter/local/settings.yml`. `profile_sources` is replaced as a whole by the higher-precedence project-local settings layer, so this local source overrides the committed remote source instead of composing with it:
-
-```yaml
-# .outfitter/local/settings.yml — never commit
-profile_sources:
-  - path: ../../../../<owner>/.agents/profiles
-```
-
-`path:` is resolved relative to `.outfitter/local/settings.yml`. Adjust the relative path for the standardized workspace layout, and verify the resolved target before launching:
+Create ignored `local/settings.yml` with absolute paths. Absolute paths are intentional here because consumers at different directory depths may symlink the same file. Use a shell-expanded `$HOME`; do not write literal `~`, because Outfitter does not shell-expand it.
 
 ```bash
-realpath .outfitter/local/../../../../<owner>/.agents/profiles
+catalog="$HOME/repos/ncrmro/.agents"
+mkdir -p "$catalog/local"
+cat > "$catalog/local/settings.yml" <<EOF
+default_profile: founder
+profile_export: true
+profile_sources:
+  - path: $HOME/repos/unsupervised/ai-outfitters/default-profiles/profiles
+  - path: $HOME/repos/unsupervised/ai-outfitters/community-profiles/profiles
+  - path: $HOME/repos/unsupervised/ai-outfitters/outfitter/.outfitter
+  - path: $HOME/repos/unsupervised/ai-outfitters/actions/.outfitter
+  - path: $HOME/repos/ncrmro/.agents/profiles
+EOF
+```
+
+Adjust only machine-local entries when a development branch publishes from another root. On this machine:
+
+- Outfitter's active development checkout publishes the `outfitter` skill from `code/cli/`.
+- Actions main is isolated at `~/repos/unsupervised/worktrees/actions/main`, so its source is that worktree's `.outfitter/`.
+
+From a consumer using the standardized layout, symlink the canonical live graph into project-local settings:
+
+```bash
+mkdir -p .outfitter/local
+ln -s ../../../../ncrmro/.agents/local/settings.yml \
+  .outfitter/local/settings.yml
+```
+
+Verify every boundary:
+
+```bash
+realpath .outfitter/local/settings.yml
 outfitter profile lint --strict
 outfitter profile list
 ```
 
-Do not use `~` in `path:` entries: current Outfitter path resolution does not shell-expand it. Prefer a relative path; an absolute path is acceptable only in an ignored machine-private file when workspace layouts differ.
+The expected profile list includes this repository's roles plus profiles from the default and community catalogs. Remove or rename the local settings symlink temporarily, run `outfitter sync`, and validate again when testing the portable published graph.
 
 ## Development workflow
 
-1. Choose either a pinned remote source for portability or a committed relative source for a standardized workspace.
-2. For pinned remote consumers, enable live development with ignored project-local settings pointing at the canonical checkout. Direct-source consumers already load it live.
-3. Keep consumer-specific behavior in the consumer repository; generalize shared profile changes here.
-4. Review changes from the canonical checkout:
-
-   ```bash
-   git -C "$HOME/repos/ncrmro/.agents" status --short
-   git -C "$HOME/repos/ncrmro/.agents" diff
-   ```
-
-5. Validate from at least one consuming project:
-
-   ```bash
-   outfitter profile lint --strict
-   outfitter profile list
-   ```
-
-6. When changing role composition, extensions, inheritance, or subagent generation, launch the affected profile and confirm the expected tools, skills, and subagents are present.
-7. Commit and push from this repository. For remote consumers, update the pinned `ref` after reviewing the shared diff.
-8. For remote consumers, temporarily remove the local override and run `outfitter sync` when validating the published path.
+1. Confirm each source checkout is clean enough for the intended work; preserve unrelated branches and changes.
+2. Edit a resource only in the repository that owns it:
+   - shared roles here;
+   - `outfitter-actions` in `ai-outfitter/actions`;
+   - community roles in `ai-outfitter/community-profiles`;
+   - default roles in `ai-outfitter/default-profiles`;
+   - the `outfitter` skill in `ai-outfitter/outfitter`.
+3. Validate from a consumer with `outfitter profile lint --strict` and `outfitter profile list`.
+4. Launch the affected profile and confirm expected tools, skills, subagents, and prompt behavior.
+5. Review and commit in each owning repository independently.
+6. Update pinned remote refs in this repository only after reviewing upstream diffs.
+7. Push this repository, update each consumer's pinned `remote_settings` ref, remove the local override, and run `outfitter sync` to test the published graph.
 
 ## Change standards
 
 - Preserve focused roles and explicit inheritance.
 - Keep prompts concise and behaviorally testable.
-- Pin external resources when reproducibility or supply-chain risk requires it.
-- Document temporary compatibility decisions and link the upstream issue that can remove them.
-- Update this file when the canonical checkout location, source convention, validation commands, or Outfitter migration status changes.
+- Keep the published and live source graphs equivalent and in the same precedence order.
+- Pin published sources when reproducibility or supply-chain risk requires it.
+- Document compatibility exceptions and link the upstream issue or release that can remove them.
+- Update this file whenever checkout locations, catalog roots, source precedence, validation commands, or Outfitter migration status changes.

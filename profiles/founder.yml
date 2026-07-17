@@ -2,6 +2,10 @@ id: founder
 label: Founder
 description: Founder-operator defaults for product, research, engineering, and concise strategic prose.
 controls:
+  skills:
+    - outfitter
+  # outfitter-actions is supplied by the actions source and can be selected while
+  # iterating on that skill with an Outfitter release that supports its glob assets.
   # These skills are available from .agents/skills, which is canonical for now.
   # Keep them disabled here pending the Outfitter refactor for native .agents support.
   # skills:
