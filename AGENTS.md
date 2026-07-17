@@ -11,7 +11,7 @@ Until that refactor lands, this repository provides two equivalent source graphs
 1. `settings.yml` pins published GitHub revisions for portable consumers and CI.
 2. Ignored `local/settings.yml` replaces those sources with live local checkouts for development.
 
-A consumer commits the flattened published source graph, then symlinks this repository's ignored local settings file when it wants live edits. Outfitter does not recursively load `settings.yml` from a profile source, and a user's higher-precedence `profile_sources` can mask lower remote settings. Keeping the portable graph explicit avoids that ambiguity. The project-local settings layer replaces `profile_sources` as a whole, so the shared live graph cleanly overrides the published graph.
+A consumer commits the flattened published source graph, then writes its own ignored `.outfitter/local/settings.yml` when it wants live edits. That local file includes this checkout's `profiles/` directory and the local repositories that publish the other selected resources. It MUST be a regular settings file, not a symlink. Outfitter does not recursively load `settings.yml` from a profile source, and a user's higher-precedence `profile_sources` can mask lower remote settings. Keeping both graphs explicit avoids that ambiguity. The project-local settings layer replaces `profile_sources` as a whole, so the live graph cleanly overrides the published graph.
 
 ## Scope and portability
 
@@ -135,7 +135,7 @@ The consumer SHOULD ignore only machine-private state:
 
 ## Live local source graph
 
-Create ignored `local/settings.yml` with absolute paths. Absolute paths are intentional here because consumers at different directory depths may symlink the same file. Use a shell-expanded `$HOME`; do not write literal `~`, because Outfitter does not shell-expand it.
+Create ignored `local/settings.yml` with absolute paths as the canonical machine-local composition template. Use a shell-expanded `$HOME`; do not write literal `~`, because Outfitter does not shell-expand it.
 
 ```bash
 catalog="$HOME/repos/ncrmro/.agents"
@@ -157,23 +157,26 @@ Adjust only machine-local entries when a development branch publishes from anoth
 - Outfitter's active development checkout publishes the `outfitter` skill from `code/cli/`.
 - Actions main is isolated at `~/repos/unsupervised/worktrees/actions/main`, so its source is that worktree's `.outfitter/`.
 
-From a consumer using the standardized layout, symlink the canonical live graph into project-local settings:
+From a consumer using the same machine, create a regular project-local settings file from the template:
 
 ```bash
 mkdir -p .outfitter/local
-ln -s ../../../../ncrmro/.agents/local/settings.yml \
+cp "$HOME/repos/ncrmro/.agents/local/settings.yml" \
   .outfitter/local/settings.yml
+test -f .outfitter/local/settings.yml
+test ! -L .outfitter/local/settings.yml
 ```
+
+The copied settings explicitly include `$HOME/repos/ncrmro/.agents/profiles` as the highest-precedence local profile source. Keep the consumer copy synchronized when the machine-local source graph changes; do not replace it with a symlink.
 
 Verify every boundary:
 
 ```bash
-realpath .outfitter/local/settings.yml
 outfitter profile lint --strict
 outfitter profile list
 ```
 
-The expected profile list includes this repository's roles plus profiles from the default and community catalogs. Remove or rename the local settings symlink temporarily, run `outfitter sync`, and validate again when testing the portable published graph.
+The expected profile list includes this repository's roles plus profiles from the default and community catalogs. Remove or rename the consumer's local settings file temporarily, run `outfitter sync`, and validate again when testing the portable published graph.
 
 ## Development workflow
 
