@@ -11,7 +11,7 @@ Until that refactor lands, this repository provides two equivalent source graphs
 1. `settings.yml` pins published GitHub revisions for portable consumers and CI.
 2. Ignored `local/settings.yml` replaces those sources with live local checkouts for development.
 
-A consumer pins this repository's `settings.yml` as remote settings, then symlinks the ignored local settings file when it wants live edits. Outfitter's project-local settings layer replaces `profile_sources` as a whole, so the live graph cleanly overrides the published graph.
+A consumer commits the flattened published source graph, then symlinks this repository's ignored local settings file when it wants live edits. Outfitter does not recursively load `settings.yml` from a profile source, and a user's higher-precedence `profile_sources` can mask lower remote settings. Keeping the portable graph explicit avoids that ambiguity. The project-local settings layer replaces `profile_sources` as a whole, so the shared live graph cleanly overrides the published graph.
 
 ## Scope and portability
 
@@ -100,18 +100,30 @@ If `main` is already checked out elsewhere, point the local source graph at that
 
 ## Portable consumer configuration
 
-A consuming project SHOULD commit `.outfitter/settings.yml` that pins this repository's published settings:
+A consuming project SHOULD commit `.outfitter/settings.yml` with the flattened published graph. Keep its order equivalent to this repository's `settings.yml`, and replace this repository's local `./profiles` entry with a pinned GitHub source:
 
 ```yaml
 default_profile: founder
 profile_export: false
-remote_settings:
+profile_sources:
+  - github: ai-outfitter/default-profiles
+    ref: <reviewed-commit>
+    path: profiles
+  - github: ai-outfitter/community-profiles
+    ref: <reviewed-commit>
+    path: profiles
+  - github: ai-outfitter/outfitter
+    ref: <reviewed-commit>
+    path: .outfitter
+  - github: ai-outfitter/actions
+    ref: <reviewed-commit>
+    path: .outfitter
   - github: ncrmro/.agents
     ref: <reviewed-commit>
-    path: settings.yml
+    path: profiles
 ```
 
-This repository is public, so Outfitter can sync it and the public `ai-outfitter/*` catalogs without private-catalog configuration. After changing `settings.yml` or shared profiles, push this repository and bump the consumer's reviewed commit.
+All catalogs are public, so Outfitter can sync them without private-catalog configuration. After changing a source or shared profile, push its owning repository and bump the relevant consumer ref.
 
 The consumer SHOULD ignore only machine-private state:
 
@@ -176,7 +188,7 @@ The expected profile list includes this repository's roles plus profiles from th
 4. Launch the affected profile and confirm expected tools, skills, subagents, and prompt behavior.
 5. Review and commit in each owning repository independently.
 6. Update pinned remote refs in this repository only after reviewing upstream diffs.
-7. Push this repository, update each consumer's pinned `remote_settings` ref, remove the local override, and run `outfitter sync` to test the published graph.
+7. Push this repository, update each consumer's affected source refs, remove the local override, and run `outfitter sync` to test the published graph.
 
 ## Change standards
 
