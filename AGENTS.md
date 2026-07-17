@@ -76,13 +76,13 @@ For live profile development, create `.outfitter/local/settings.yml`. `profile_s
 ```yaml
 # .outfitter/local/settings.yml — never commit
 profile_sources:
-  - path: ../../../<owner>/.agents/profiles
+  - path: ../../../../<owner>/.agents/profiles
 ```
 
 `path:` is resolved relative to `.outfitter/local/settings.yml`. Adjust the relative path for the standardized workspace layout, and verify the resolved target before launching:
 
 ```bash
-realpath .outfitter/local/../../../<owner>/.agents/profiles
+realpath .outfitter/local/../../../../<owner>/.agents/profiles
 outfitter profile lint --strict
 outfitter profile list
 ```
