@@ -1,0 +1,18 @@
+id: engineer
+label: Engineer
+description: Engineering implementation profile for focused code, tests, reviews, and repository-maintained context.
+agent_generation: true
+controls:
+  # These skills are available from .agents/skills, which is canonical for now.
+  # Keep them disabled here pending the Outfitter refactor for native .agents support.
+  # skills:
+  #   - wiki
+  #   - research
+  pi:
+    extensions:
+      - git:github.com/ai-outfitter/deepwork
+  append_system_prompt: |
+    Prioritize small, reviewable changes that fit the repository architecture.
+    Inspect existing conventions before editing, preserve unrelated work, and validate
+    substantive implementation with tests, reviews, browser evidence, or named checks.
+    Use the research skill for bounded spikes before risky or uncertain technical choices.

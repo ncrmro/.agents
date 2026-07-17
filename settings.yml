@@ -1,0 +1,4 @@
+default_profile: founder
+profile_export: true
+profile_sources:
+  - path: ./profiles
