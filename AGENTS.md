@@ -6,7 +6,7 @@ This repository is the canonical development checkout for project-agnostic agent
 
 Outfitter currently authors and loads profiles from `.outfitter/`. Open Outfitter RFC [ai-outfitter/outfitter#165](https://github.com/ai-outfitter/outfitter/issues/165) proposes replacing profile-era `.outfitter` configuration with the Dotagents `.agents` protocol, including `~/.agents/` as the global layer and `<project>/.agents/` as the workspace overlay. The RFC is not yet the released standard.
 
-Until that refactor lands, this repository keeps the profile-era layout at its root. Consumer projects should commit a small `.outfitter/settings.yml` that selects this repository as a pinned remote profile source, while developers may use machine-private `.outfitter/local/settings.yml` to replace that source with a live local checkout. This preserves a portable published baseline and an editable local feedback loop without copying profiles into consumers.
+Until that refactor lands, this repository keeps the profile-era layout at its root. Consumer projects should commit a small `.outfitter/settings.yml` selecting either a pinned remote revision or, when every environment follows the standardized workspace layout, this live checkout by relative path. A pinned remote consumer may use machine-private `.outfitter/local/settings.yml` to replace the remote with a live local checkout. These patterns avoid copying profiles into consumers.
 
 ## Scope and portability
 
@@ -61,6 +61,20 @@ profile_sources:
 
 Public GitHub repositories work directly. Private GitHub catalogs require the documented Outfitter Enterprise opt-in in the user's `~/.outfitter/settings.yml`. Do not place credentials in project settings.
 
+### Workspace-coupled direct source
+
+A consuming project MAY instead commit a direct relative source when contributors and automation use the standardized workspace layout:
+
+```yaml
+default_profile: founder
+profile_export: true
+profile_sources:
+  # Resolved relative to .outfitter/settings.yml.
+  - path: ../../../<owner>/.agents/profiles
+```
+
+This loads edits from the canonical checkout immediately and does not require a project-local override. It is intentionally workspace-coupled: CI and other machines must clone this repository at the documented sibling path before invoking Outfitter. Use the pinned remote pattern when that layout cannot be guaranteed.
+
 The consumer SHOULD ignore only machine-private state, not the whole `.outfitter` directory:
 
 ```gitignore
@@ -87,12 +101,12 @@ outfitter profile lint --strict
 outfitter profile list
 ```
 
-Do not use `~` in `path:` entries: current Outfitter path resolution does not shell-expand it. Prefer a relative path in project-local settings; an absolute path is acceptable only in the ignored machine-private file when workspace layouts differ.
+Do not use `~` in `path:` entries: current Outfitter path resolution does not shell-expand it. Prefer a relative path; an absolute path is acceptable only in an ignored machine-private file when workspace layouts differ.
 
 ## Development workflow
 
-1. Keep the committed consumer settings pinned to a reviewed remote revision.
-2. Enable live development with ignored project-local settings pointing at the canonical checkout.
+1. Choose either a pinned remote source for portability or a committed relative source for a standardized workspace.
+2. For pinned remote consumers, enable live development with ignored project-local settings pointing at the canonical checkout. Direct-source consumers already load it live.
 3. Keep consumer-specific behavior in the consumer repository; generalize shared profile changes here.
 4. Review changes from the canonical checkout:
 
@@ -109,8 +123,8 @@ Do not use `~` in `path:` entries: current Outfitter path resolution does not sh
    ```
 
 6. When changing role composition, extensions, inheritance, or subagent generation, launch the affected profile and confirm the expected tools, skills, and subagents are present.
-7. Commit and push from this repository, then update the consuming project's pinned `ref` after reviewing the shared diff.
-8. Temporarily remove the local override and run `outfitter sync` when validating the published remote path.
+7. Commit and push from this repository. For remote consumers, update the pinned `ref` after reviewing the shared diff.
+8. For remote consumers, temporarily remove the local override and run `outfitter sync` when validating the published path.
 
 ## Change standards
 
@@ -118,4 +132,4 @@ Do not use `~` in `path:` entries: current Outfitter path resolution does not sh
 - Keep prompts concise and behaviorally testable.
 - Pin external resources when reproducibility or supply-chain risk requires it.
 - Document temporary compatibility decisions and link the upstream issue that can remove them.
-- Update this file when the canonical checkout location, symlink convention, validation commands, or Outfitter migration status changes.
+- Update this file when the canonical checkout location, source convention, validation commands, or Outfitter migration status changes.
