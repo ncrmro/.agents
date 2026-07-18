@@ -3,10 +3,11 @@
 Nuances for getting the wiki search toolchain working. Read this when `probe` is
 missing from PATH, or when setting up the wiki tooling in a new checkout.
 
-The core search tool, `wiki-cli` (`scripts/wiki-cli`), needs only `ripgrep` (`rg`)
-and `fd` — both are usually already present, and it never requires a devenv. The
-`probe` CLI below is an **optional** AI/semantic search layer on top; install it
-when you want fuzzy "where is X discussed" search across notes and source text.
+The core `wiki-cli search` command (`scripts/wiki-cli`) needs only `ripgrep`
+(`rg`); link and taxonomy audit commands also need `fd`. Both are usually already
+present, and neither requires a devenv. The `probe` CLI below is an **optional**
+AI/semantic search layer on top; install it when you want fuzzy "where is X
+discussed" search across notes and source text.
 
 ## Installing `probe`
 

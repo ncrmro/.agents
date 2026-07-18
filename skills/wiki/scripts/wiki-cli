@@ -21,7 +21,8 @@ Usage: wiki-cli COMMAND [ARGUMENT]
 
 Audit and search this repository's Obsidian-style wiki using fd and ripgrep. The
 tool is confined to the repo's wiki/ tree and works from any directory. search
-covers source content.md / transcript.md alongside notes.
+uses one ripgrep scan over Markdown, MDX, YAML, and JSON, including extracted
+source content.md / transcript.md alongside notes.
 
 Commands:
   check                 Report missing and ambiguous internal links
@@ -33,17 +34,17 @@ Commands:
   tags                  List every tag with an occurrence count
   tag TAG               Find TAG and all nested descendants
   tag-exact TAG         Find only the exact TAG
-  search QUERY          Search Markdown contents (notes AND source text) with ripgrep
+  search QUERY          Search text formats in the wiki with one ripgrep scan
   stats                 Show vault, note, link, and tag counts
 
 Options:
   -h, --help            Show this help
 
 Examples:
+  wiki-cli search 'CFU/mL|colony.forming unit'
   wiki-cli check
   wiki-cli tag resource/water
   wiki-cli backlinks XROOTS
-  wiki-cli search 'CFU/mL'
 
 Exit status:
   check:         1 when missing or ambiguous links exist
@@ -67,6 +68,20 @@ COMMAND=$1
 shift
 
 command -v rg >/dev/null 2>&1 || die "ripgrep (rg) is required"
+
+# Routine retrieval is the hot path for agents. Keep it to one ripgrep process,
+# with the canonical wiki as its only search root. Extracted Markdown remains
+# searchable while binary source artifacts are never opened by default.
+if [[ $COMMAND == search ]]; then
+  (($# >= 1)) || die "search requires a query"
+  exec rg -n -i --color auto --hidden \
+    --glob '*.{md,mdx,yaml,yml,json}' \
+    --glob '!.obsidian/**' \
+    --glob '!.git/**' \
+    --glob '!node_modules/**' \
+    -- "$*" "$VAULT"
+fi
+
 if command -v fd >/dev/null 2>&1; then
   FD=fd
 elif command -v fdfind >/dev/null 2>&1; then
@@ -82,6 +97,12 @@ FILES=$TMP/files
 LINKS=$TMP/links
 TAGS=$TMP/tags
 
+declare -A FILE_SET=()
+declare -A NOTE_SET=()
+declare -A FILES_BY_BASENAME=()
+declare -A NOTES_BY_BASENAME=()
+declare -a RESOLVED_MATCHES=()
+
 fd_common=(-t f -0 -E .git -E .obsidian -E node_modules)
 ((INCLUDE_HIDDEN)) && fd_common+=(-H)
 
@@ -96,22 +117,74 @@ build_file_indexes() {
   done < <("$FD" "${fd_common[@]}" . "$VAULT")
   LC_ALL=C sort -u -o "$FILES" "$FILES"
   LC_ALL=C sort -u -o "$NOTES" "$NOTES"
+
+  local rel base
+  while IFS= read -r rel; do
+    FILE_SET["$rel"]=1
+    base=${rel##*/}
+    if [[ ${FILES_BY_BASENAME[$base]+_} ]]; then
+      FILES_BY_BASENAME["$base"]+=$'\n'"$rel"
+    else
+      FILES_BY_BASENAME["$base"]=$rel
+    fi
+  done <"$FILES"
+  while IFS= read -r rel; do
+    NOTE_SET["$rel"]=1
+    base=${rel##*/}
+    if [[ ${NOTES_BY_BASENAME[$base]+_} ]]; then
+      NOTES_BY_BASENAME["$base"]+=$'\n'"$rel"
+    else
+      NOTES_BY_BASENAME["$base"]=$rel
+    fi
+  done <"$NOTES"
 }
 
-trim() {
+trim_value() {
   local s=$1
   s=${s#"${s%%[![:space:]]*}"}
   s=${s%"${s##*[![:space:]]}"}
-  printf '%s' "$s"
+  TRIMMED_VALUE=$s
 }
 
-decode_path() {
+decode_path_value() {
   local s=$1
   s=${s//%20/ }
   s=${s//%23/#}
   s=${s//%28/(}
   s=${s//%29/)}
-  printf '%s' "$s"
+  DECODED_PATH=$s
+}
+
+normalize_path_value() {
+  local path=$1 part
+  local -a parts=() normalized=()
+  IFS=/ read -r -a parts <<<"$path"
+  for part in "${parts[@]}"; do
+    case $part in
+      ''|.) ;;
+      ..)
+        if ((${#normalized[@]})); then
+          unset 'normalized[-1]'
+        else
+          NORMALIZED_PATH=../
+          return
+        fi
+        ;;
+      *) normalized+=("$part") ;;
+    esac
+  done
+  local IFS=/
+  NORMALIZED_PATH=${normalized[*]}
+}
+
+load_index_matches() {
+  local values=${1-} match
+  RESOLVED_MATCHES=()
+  [[ -n $values ]] || return 0
+  while IFS= read -r match; do
+    [[ -n $match ]] && RESOLVED_MATCHES+=("$match")
+  done <<<"$values"
+  return 0
 }
 
 # Output: source<TAB>line<TAB>kind<TAB>raw-target<TAB>clean-target
@@ -119,39 +192,46 @@ build_links() {
   [[ -f $LINKS ]] && return
   build_file_indexes
   : >"$LINKS"
-  local rel file hit line raw target
-  while IFS= read -r rel; do
-    file=$VAULT/$rel
+  local rel file hit line raw target kind
+  while IFS= read -r -d '' file && IFS= read -r hit; do
+    rel=${file#"$VAULT"/}
+    line=${hit%%:*}; raw=${hit#*:}
+    if [[ $raw == \[\[* ]]; then
+      kind=wiki
+      raw=${raw#\[\[}
+    else
+      kind=markdown
+      raw=${raw#\]\(}
+    fi
 
-    while IFS= read -r hit; do
-      line=${hit%%:*}; raw=${hit#*:}
+    if [[ $kind == wiki ]]; then
       target=${raw%%|*}
       target=${target%%#*}
       target=${target%%^*}
-      target=$(trim "$target")
+      trim_value "$target"; target=$TRIMMED_VALUE
       [[ -n $target ]] || continue
       printf '%s\t%s\twiki\t%s\t%s\n' "$rel" "$line" "$raw" "$target" >>"$LINKS"
-    done < <(rg -n -o --no-heading --color never --pcre2 '\[\[\K[^]\r\n]+' -- "$file" 2>/dev/null || true)
-
-    while IFS= read -r hit; do
-      line=${hit%%:*}; raw=${hit#*:}
+    else
       if [[ $raw == \<*\>* ]]; then
         target=${raw#<}; target=${target%%>*}
       else
         target=${raw%%[[:space:]]\"*}
       fi
       target=${target%%#*}
-      target=$(decode_path "$(trim "$target")")
+      trim_value "$target"; decode_path_value "$TRIMMED_VALUE"; target=$DECODED_PATH
       [[ -n $target && $target != \#* ]] || continue
       [[ $target =~ ^([[:alpha:]][[:alnum:]+.-]*:|//) ]] && continue
       printf '%s\t%s\tmarkdown\t%s\t%s\n' "$rel" "$line" "$raw" "$target" >>"$LINKS"
-    done < <(rg -n -o --no-heading --color never --pcre2 '\]\(\K[^)\r\n]+' -- "$file" 2>/dev/null || true)
-  done <"$NOTES"
+    fi
+  done < <(rg --null --with-filename -n -o --no-heading --color never --hidden \
+    --glob '*.md' --glob '!.obsidian/**' --glob '!.git/**' --glob '!node_modules/**' \
+    --pcre2 '\[\[[^]\r\n]+|\]\([^\)\r\n]+' -- "$VAULT" 2>/dev/null || true)
 }
 
-# Resolve a target and print zero, one, or multiple matching vault-relative paths.
+# Resolve a target into RESOLVED_MATCHES without launching another process.
 resolve_target() {
-  local source=$1 kind=$2 target=$3 candidate dir base escaped exact
+  local source=$1 kind=$2 target=$3 candidate dir base
+  RESOLVED_MATCHES=()
   target=${target#/}
   dir=${source%/*}; [[ $dir == "$source" ]] && dir=.
 
@@ -159,51 +239,49 @@ resolve_target() {
     candidate=$target
     [[ $candidate == /* ]] || candidate=$dir/$candidate
     while [[ $candidate == ./* ]]; do candidate=${candidate#./}; done
-    # Collapse simple path/../ segments without requiring realpath or file existence.
-    candidate=$(awk -F/ '{ n=0; for(i=1;i<=NF;i++){if($i=="..")n--;else if($i!="."&&$i!="")a[++n]=$i} for(i=1;i<=n;i++)printf "%s%s",a[i],(i<n?"/":"") }' <<<"$candidate")
-    rg -F -x -- "$candidate" "$FILES" || true
-    return
+    normalize_path_value "$candidate"; candidate=$NORMALIZED_PATH
+    [[ ${FILE_SET[$candidate]+_} ]] && RESOLVED_MATCHES=("$candidate")
+    return 0
   fi
 
   # Explicit extensions may refer to notes or attachments. Try them unchanged.
   if [[ $target == *.* ]]; then
     if [[ $target == */* ]]; then
-      exact=$(rg -F -x -- "$target" "$FILES" || true)
+      [[ ${FILE_SET[$target]+_} ]] && RESOLVED_MATCHES=("$target")
     else
-      base=$(printf '%s' "$target" | sed 's/[][(){}.^$*+?|\\]/\\&/g')
-      exact=$(rg --pcre2 "(^|/)${base}$" "$FILES" || true)
+      load_index_matches "${FILES_BY_BASENAME[$target]-}"
     fi
-    if [[ -n $exact ]]; then printf '%s\n' "$exact"; return; fi
+    ((${#RESOLVED_MATCHES[@]})) && return 0
   fi
 
   candidate=$target
   [[ ${candidate,,} == *.md ]] || candidate+=.md
   if [[ $target == */* ]]; then
-    rg -F -x -- "$candidate" "$NOTES" || true
-    return
+    [[ ${NOTE_SET[$candidate]+_} ]] && RESOLVED_MATCHES=("$candidate")
+    return 0
   fi
 
   base=${candidate##*/}
-  escaped=$(printf '%s' "$base" | sed 's/[][(){}.^$*+?|\\]/\\&/g')
-  rg --pcre2 "(^|/)${escaped}$" "$NOTES" || true
+  load_index_matches "${NOTES_BY_BASENAME[$base]-}"
+  return 0
 }
 
 # Output: status<TAB>source<TAB>line<TAB>kind<TAB>target<TAB>matches
 link_report() {
   build_links
-  local source line kind raw target matches count status joined
+  local source line kind raw target count status joined
   while IFS=$'\t' read -r source line kind raw target; do
-    mapfile -t matches < <(resolve_target "$source" "$kind" "$target")
-    count=${#matches[@]}
+    resolve_target "$source" "$kind" "$target"
+    count=${#RESOLVED_MATCHES[@]}
     status=ok; joined=
     if ((count == 0)); then
       status=missing
     elif ((count > 1)); then
       status=ambiguous
-      printf -v joined '%s | ' "${matches[@]}"
+      printf -v joined '%s | ' "${RESOLVED_MATCHES[@]}"
       joined=${joined% | }
     else
-      joined=${matches[0]}
+      joined=${RESOLVED_MATCHES[0]}
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$status" "$source" "$line" "$kind" "$target" "$joined"
   done <"$LINKS"
@@ -211,6 +289,8 @@ link_report() {
 
 print_report_status() {
   local wanted=$1 status source line kind target matches found=0
+  local report=$TMP/report
+  link_report >"$report"
   while IFS=$'\t' read -r status source line kind target matches; do
     [[ $status == "$wanted" ]] || continue
     found=1
@@ -219,7 +299,7 @@ print_report_status() {
     else
       printf '%s:%s: %s\n' "$source" "$line" "$target"
     fi
-  done < <(link_report)
+  done <"$report"
   return "$found"
 }
 
@@ -256,10 +336,12 @@ command_backlinks() {
   [[ -n $target_note ]] || die "note not found: $1"
 
   while IFS=$'\t' read -r source line kind raw target; do
-    while IFS= read -r resolved; do
+    resolve_target "$source" "$kind" "$target"
+    for resolved in "${RESOLVED_MATCHES[@]}"; do
       [[ $resolved == "$target_note" ]] && printf '%s:%s\t%s\n' "$source" "$line" "$target"
-    done < <(resolve_target "$source" "$kind" "$target")
+    done
   done <"$LINKS"
+  return 0
 }
 
 command_orphans() {
@@ -267,9 +349,10 @@ command_orphans() {
   local incoming=$TMP/incoming source line kind raw target resolved
   : >"$incoming"
   while IFS=$'\t' read -r source line kind raw target; do
-    while IFS= read -r resolved; do
+    resolve_target "$source" "$kind" "$target"
+    for resolved in "${RESOLVED_MATCHES[@]}"; do
       [[ ${resolved,,} == *.md ]] && printf '%s\n' "$resolved" >>"$incoming"
-    done < <(resolve_target "$source" "$kind" "$target")
+    done
   done <"$LINKS"
   LC_ALL=C sort -u -o "$incoming" "$incoming"
   comm -23 "$NOTES" "$incoming"
@@ -281,33 +364,49 @@ build_tags() {
   build_file_indexes
   : >"$TAGS"
   local rel file hit line tag
-  while IFS= read -r rel; do
-    file=$VAULT/$rel
-    while IFS= read -r hit; do
-      line=${hit%%:*}; tag=${hit#*:}; tag=${tag#\#}
-      printf '%s\t%s\t%s\n' "$rel" "$line" "$tag" >>"$TAGS"
-    done < <(rg -n -o --no-heading --color never --pcre2 '(?<![\pL\pN_])#[\pL\pN_/-]+' -- "$file" 2>/dev/null || true)
 
-    # Parse tags/tag from YAML frontmatter, including flow and block lists.
-    awk -v src="$rel" '
-      BEGIN { squote=sprintf("%c", 39) }
-      NR==1 && $0=="---" { front=1; next }
-      front && $0=="---" { exit }
-      front && /^[[:space:]]*(tags|tag):/ {
-        in_tags=1; value=$0; sub(/^[^:]*:[[:space:]]*/, "", value)
-        gsub(/[\[\]"]/, "", value); gsub(squote, "", value); n=split(value,a,/,/)
-        for(i=1;i<=n;i++){gsub(/^[[:space:]#]+|[[:space:]]+$/, "", a[i]); if(a[i]!="") print src "\t" NR "\t" a[i]}
-        next
+  # Find inline tags in one vault-wide scan instead of one rg process per note.
+  while IFS= read -r -d '' file && IFS= read -r hit; do
+    rel=${file#"$VAULT"/}
+    line=${hit%%:*}; tag=${hit#*:}; tag=${tag#\#}
+    printf '%s\t%s\t%s\n' "$rel" "$line" "$tag" >>"$TAGS"
+  done < <(rg --null --with-filename -n -o --no-heading --color never --hidden \
+    --glob '*.md' --glob '!.obsidian/**' --glob '!.git/**' --glob '!node_modules/**' \
+    --pcre2 '(?<![\pL\pN_])#[\pL\pN_/-]+' -- "$VAULT" 2>/dev/null || true)
+
+  # Parse YAML frontmatter for every note in one awk process. The file list is
+  # read from disk so large vaults do not run into command-line length limits.
+  awk -v vault="$VAULT/" -v notes_file="$NOTES" '
+    BEGIN {
+      squote=sprintf("%c", 39)
+      while ((getline src < notes_file) > 0) {
+        path=vault src; line=0; front=0; in_tags=0
+        while ((getline text < path) > 0) {
+          line++
+          if (line==1 && text=="---") { front=1; continue }
+          if (front && text=="---") break
+          if (front && text ~ /^[[:space:]]*(tags|tag):/) {
+            in_tags=1; value=text; sub(/^[^:]*:[[:space:]]*/, "", value)
+            gsub(/[\[\]"]/, "", value); gsub(squote, "", value); n=split(value,a,/,/)
+            for(i=1;i<=n;i++) {
+              gsub(/^[[:space:]#]+|[[:space:]]+$/, "", a[i])
+              if(a[i]!="") print src "\t" line "\t" a[i]
+            }
+            continue
+          }
+          if (front && in_tags && text ~ /^[[:space:]]*-[[:space:]]*/) {
+            value=text; sub(/^[[:space:]]*-[[:space:]#]*/, "", value)
+            gsub(/"/, "", value); gsub(squote, "", value); sub(/[[:space:]]+$/, "", value)
+            if(value!="") print src "\t" line "\t" value
+            continue
+          }
+          if (front && in_tags && text !~ /^[[:space:]]/) in_tags=0
+        }
+        close(path)
       }
-      front && in_tags && /^[[:space:]]*-[[:space:]]*/ {
-        value=$0; sub(/^[[:space:]]*-[[:space:]#]*/, "", value)
-        gsub(/"/, "", value); gsub(squote, "", value); sub(/[[:space:]]+$/, "", value)
-        if(value!="") print src "\t" NR "\t" value
-        next
-      }
-      front && in_tags && !/^[[:space:]]/ { in_tags=0 }
-    ' "$file" >>"$TAGS"
-  done <"$NOTES"
+      close(notes_file)
+    }
+  ' >>"$TAGS"
   LC_ALL=C sort -u -o "$TAGS" "$TAGS"
 }
 
@@ -332,9 +431,13 @@ command_tag() {
 
 command_stats() {
   build_file_indexes; build_links; build_tags
-  local missing ambiguous
-  missing=$(link_report | awk -F '\t' '$1=="missing"{n++} END{print n+0}')
-  ambiguous=$(link_report | awk -F '\t' '$1=="ambiguous"{n++} END{print n+0}')
+  local missing=0 ambiguous=0 status source line kind target matches
+  local report=$TMP/report
+  link_report >"$report"
+  while IFS=$'\t' read -r status source line kind target matches; do
+    [[ $status == missing ]] && ((++missing))
+    [[ $status == ambiguous ]] && ((++ambiguous))
+  done <"$report"
   printf 'Vault:           %s\n' "$VAULT"
   printf 'Markdown notes:  %s\n' "$(wc -l <"$NOTES")"
   printf 'Internal links:  %s\n' "$(wc -l <"$LINKS")"
@@ -346,10 +449,14 @@ command_stats() {
 case $COMMAND in
   check)
     (($# == 0)) || die "check takes no arguments"
-    report=$TMP/report; link_report >"$report"
-    awk -F '\t' '$1=="missing" {printf "%s:%s: missing: %s\n",$2,$3,$5}
-      $1=="ambiguous" {printf "%s:%s: ambiguous: %s -> %s\n",$2,$3,$5,$6}' "$report"
-    rg -q -e '^missing\t' -e '^ambiguous\t' "$report" && exit 1 || exit 0
+    report=$TMP/report; link_report >"$report"; found=0
+    while IFS=$'\t' read -r status source line kind target matches; do
+      case $status in
+        missing) printf '%s:%s: missing: %s\n' "$source" "$line" "$target"; found=1 ;;
+        ambiguous) printf '%s:%s: ambiguous: %s -> %s\n' "$source" "$line" "$target" "$matches"; found=1 ;;
+      esac
+    done <"$report"
+    ((found)) && exit 1 || exit 0
     ;;
   missing) (($# == 0)) || die "missing takes no arguments"; print_report_status missing && exit 0 || exit 1 ;;
   ambiguous) (($# == 0)) || die "ambiguous takes no arguments"; print_report_status ambiguous && exit 0 || exit 1 ;;
@@ -358,7 +465,6 @@ case $COMMAND in
   links) (($# <= 1)) || die "links takes zero or one note"; command_links "${1-}" ;;
   tags) (($# == 0)) || die "tags takes no arguments"; command_tags ;;
   tag|tag-exact) command_tag "$@" ;;
-  search) (($# >= 1)) || die "search requires a query"; build_file_indexes; rg -n -i --color auto --glob '*.md' --glob '!.obsidian/**' --glob '!.git/**' -- "$*" "$VAULT" ;;
   stats) (($# == 0)) || die "stats takes no arguments"; command_stats ;;
   *) die "unknown command: $COMMAND (try --help)" ;;
 esac

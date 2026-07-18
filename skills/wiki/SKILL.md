@@ -197,14 +197,22 @@ Keep namespaces disjoint by role — e.g. equipment under `system/`, an input un
 
 **Always search the wiki before answering a question about its contents, adding a note, or introducing a tag — and always search the sources, not just the notes.** A source's evidence lives in its `content.md` / `transcript.md`, so a plain-note grep silently misses it.
 
-### `wiki-cli` (primary — always available)
-
-`./scripts/wiki-cli` is a ripgrep + fd tool that audits and searches the vault from any shell, needs no running app, and is confined to the repository's `wiki/` tree (so it runs the same from any directory without scanning `docs/`, `code/`, or the caller's working directory). Its `search` globs all Markdown inside that vault, so it covers source `content.md` / `transcript.md` alongside notes. **Prefer it** — it is the reliable path in agent and headless environments where the Obsidian CLI is unavailable.
-
-Setup: none beyond `ripgrep` (`rg`) and `fd` on `PATH`; the script is committed executable. It intentionally does not accept an alternate vault path.
+For routine retrieval, make **one agent tool call containing one `wiki-cli search` command**. Compose the primary term, synonyms, and related phrases into one ripgrep expression instead of issuing a sequence of searches:
 
 ```bash
-./scripts/wiki-cli search 'query'      # full-text over all notes AND source text
+./scripts/wiki-cli search 'primary term|synonym|related phrase'
+```
+
+Do not precede it with `fd`, `find`, `ls`, or another `rg`; do not loop over terms, folders, files, or note types; and do not separately search notes and sources. `wiki-cli search` already makes one scan across the whole wiki. Run taxonomy and link audits (`tags`, `backlinks`, `check`, and related commands) only when the task actually needs those results, such as preparing a wiki modification or performing an explicit health check—not during routine reading.
+
+### `wiki-cli` (primary — always available)
+
+`./scripts/wiki-cli` is a ripgrep + fd tool that audits and searches the vault from any shell, needs no running app, and is confined to the repository's `wiki/` tree (so it runs the same from any directory without scanning `docs/`, `code/`, or the caller's working directory). Its `search` command executes exactly one `rg` process with that canonical `wiki/` directory as its only search root. It reads only `*.md`, `*.mdx`, `*.yaml`, `*.yml`, and `*.json`, covering source `content.md` / `transcript.md` alongside notes without opening PDFs, audio, video, images, or other binary artifacts. **Prefer it** — it is the reliable and efficient path in agent and headless environments where the Obsidian CLI is unavailable.
+
+Setup: `search` needs only `ripgrep` (`rg`) on `PATH`; audit commands also need `fd`. The script is committed executable and intentionally does not accept an alternate vault path.
+
+```bash
+./scripts/wiki-cli search 'x|alias|y'  # DEFAULT: one call/scan over notes + source text
 ./scripts/wiki-cli tags                # every tag with a count — reuse before adding
 ./scripts/wiki-cli tag topic/<x>       # a tag and all nested descendants
 ./scripts/wiki-cli tag-exact topic/<x> # only the exact tag
@@ -216,7 +224,7 @@ Setup: none beyond `ripgrep` (`rg`) and `fd` on `PATH`; the script is committed 
 ./scripts/wiki-cli --help
 ```
 
-Paths are relative to this skill directory. `tags` (taxonomy before tagging) and `backlinks` / `check` (link health before and after renaming) cover the checks the agent rules require. For anything `wiki-cli` does not expose, fall back to `rg` / `fd` directly over `wiki/`.
+Paths are relative to this skill directory. `tags` (taxonomy before tagging) and `backlinks` / `check` (link health before and after renaming) cover the checks the agent rules require. For anything `wiki-cli` does not expose, fall back to one batched `rg` invocation in one agent tool call, with the repository's canonical `wiki/` directory as its explicit and only search root. Apply the same text-file globs unless the task explicitly requires inspecting another known file type; never aim the fallback at the repository root.
 
 ### `probe` (optional — fuzzy / ranked AI search)
 
