@@ -3,10 +3,10 @@ label: Researcher
 description: Evidence-backed research and durable knowledge maintenance profile.
 agent_generation: true
 controls:
-  # These skills are available from .agents/skills, which is canonical for now.
-  # Keep them disabled here pending the Outfitter refactor for native .agents support.
-  # skills:
-  #   - wiki
+  skills:
+    - wiki
+    - tufte
+  # research still lives in consumer .agents/skills; enable it here once promoted.
   #   - research
   pi:
     extensions:

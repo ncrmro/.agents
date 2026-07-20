@@ -9,7 +9,7 @@ The start-to-finish flow for adopting agent dotfiles: establish your personal `~
 Three layers, from most personal to most shared:
 
 1. **Personal** — `<username>/.agents`, linked at `~/.agents`. Your roles, skills, and source graph. Highest precedence everywhere you work.
-2. **Machine** — ignored `local/settings.yml` files pointing at live local checkouts and worktrees. Never committed.
+2. **Machine** — ignored `legacy/outfitter/local/settings.yml` files pointing at live local checkouts and worktrees. Never committed.
 3. **Project** — a consumer repository's committed, pinned source graph plus its own domain skills and context.
 
 Outfitter merges `profile_sources` last-wins: the last entry in the list is the highest precedence. Your personal layer is always listed last, so it overrides everything, and changes trickle upstream without ever changing behavior out from under you (see `AGENTS.md` for the full precedence and source-graph reference).
@@ -28,23 +28,23 @@ The symlink makes the repo the durable home of your agent configuration while ke
 
 Your repository should contain, at minimum:
 
-- `profiles/` — your roles, defined by reusable responsibilities (see `CONTRIBUTING.md` for scope rules).
+- `legacy/outfitter/profiles/` — transitional Outfitter 0.10 roles defined by reusable responsibilities.
 - `skills/` — personal skills, discovered through the profile source's catalog root.
-- `settings.yml` — your published source graph, pinned to reviewed upstream refs, with your own `./profiles` listed last.
+- `legacy/outfitter/settings.yml` — the published Outfitter 0.10 graph, with its sibling `./profiles` listed last.
 
 Everything here MUST be project-agnostic. The moment something references a specific project, it belongs in that project instead.
 
 ## Step 2: point at local development checkouts
 
-To edit upstream resources live (or your own, from a consumer), replace the pinned graph with an ignored machine-local one. Create `local/settings.yml` listing absolute paths to your checkouts, keeping the same order — your personal `profiles/` last:
+To edit upstream resources live (or your own, from a consumer), replace the pinned graph with an ignored machine-local one. Create `legacy/outfitter/local/settings.yml` listing absolute paths to your checkouts, keeping the same order — your personal legacy profiles last:
 
 ```yaml
-# ~/.agents/local/settings.yml (ignored)
+# ~/.agents/legacy/outfitter/local/settings.yml (ignored)
 profile_sources:
   # Merged last-wins: LAST entry is HIGHEST precedence.
   - path: /home/<user>/repos/upstream-org/some-catalog/profiles
   # Personal overrides — highest precedence; keep last.
-  - path: /home/<user>/repos/<username>/.agents/profiles
+  - path: /home/<user>/repos/<username>/.agents/legacy/outfitter/profiles
 ```
 
 Point an entry at a **worktree** when the checkout's current branch has unrelated work — never switch or reset a checkout you don't own the state of. Concrete checkout layout, clone commands, worktree setup, and the full template for this machine live in the [local development runbook](local-development.md).
@@ -77,7 +77,7 @@ The layers give every resource one obvious home and a low-churn path between hom
 ## Summary checklist
 
 - [ ] `<username>/.agents` cloned and symlinked at `~/.agents`
-- [ ] Published `settings.yml` pinned, personal `./profiles` last
-- [ ] Ignored `local/settings.yml` pointing at live checkouts/worktrees
+- [ ] Published `legacy/outfitter/settings.yml` pinned, sibling `./profiles` last
+- [ ] Ignored `legacy/outfitter/local/settings.yml` points at live checkouts/worktrees
 - [ ] Each project commits its pinned graph and ignores `/local/`
 - [ ] `outfitter profile lint --strict` clean at every boundary

@@ -1,7 +1,7 @@
 default_profile: founder
 profile_export: false
 profile_sources:
-  # Published baselines, ordered from lowest to highest precedence.
+  # Merged last-wins: LAST entry is HIGHEST precedence.
   - github: ai-outfitter/default-profiles
     ref: 6b2e61e9b8f6a3213abf0729a98b5c0617d08372
     path: profiles
@@ -14,5 +14,5 @@ profile_sources:
   - github: ai-outfitter/actions
     ref: 26387cfd3ae9e9b48a9dc4006e08623defa76436
     path: .outfitter
-  # This repository's profiles intentionally override same-ID published defaults.
+  # Personal overrides — highest precedence; keep last.
   - path: ./profiles

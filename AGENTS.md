@@ -16,7 +16,7 @@ Highest precedence first (note this is the **reverse** of YAML list order, where
 
 | Source | Published catalog root | Typical local source | Resources used here |
 | --- | --- | --- | --- |
-| `ncrmro/.agents` | `profiles/` | `~/repos/ncrmro/.agents/profiles` | Personal overrides and shared roles |
+| `ncrmro/.agents` | `legacy/outfitter/profiles/` | `~/repos/ncrmro/.agents/legacy/outfitter/profiles` | Personal overrides and shared roles during the Outfitter 0.10 transition |
 | `ai-outfitter/actions` | `.outfitter/` | Primary checkout or a clean main worktree's `.outfitter/` | `outfitter-actions` skill |
 | `ai-outfitter/outfitter` | `.outfitter/` on current main | Checkout-dependent: `.outfitter/` on main; some development branches publish from `code/cli/` | Local `outfitter` skill |
 | `ai-outfitter/community-profiles` | `profiles/` | `~/repos/unsupervised/ai-outfitters/community-profiles/profiles` | Community roles such as `github-actions` |
@@ -28,16 +28,17 @@ The `founder` profile selects the local `outfitter` skill. The actions source ex
 
 RFC [ai-outfitter/outfitter#165](https://github.com/ai-outfitter/outfitter/issues/165) proposes replacing profile-era `.outfitter` configuration with the Dotagents `.agents` protocol; until it lands, treat profile-era files as transitional. This repository provides:
 
-1. `settings.yml` — pinned published GitHub revisions for portable consumers and CI.
-2. Ignored `local/settings.yml` — the same graph as live local checkouts for development.
+1. `legacy/outfitter/settings.yml` — pinned published GitHub revisions for portable Outfitter 0.10 consumers and CI.
+2. Ignored `legacy/outfitter/local/settings.yml` — the same graph as live local checkouts for development.
 
 A consumer commits the flattened published graph, then writes its own ignored `.outfitter/local/settings.yml` for live edits. The local file MUST be a regular file, not a symlink, and it replaces `profile_sources` wholesale — Outfitter does not recursively load `settings.yml` from a profile source. Keep both graphs in the same precedence order. See the runbook for the concrete templates and commands.
 
 ## Repository layout
 
-- `settings.yml` — portable, pinned remote source graph.
-- `profiles/` — project-agnostic roles owned by this repository.
-- `local/settings.yml` — ignored machine-local live source graph.
+- `skills/` — canonical protocol-native personal skill catalog.
+- `legacy/outfitter/settings.yml` — portable, pinned Outfitter 0.10 source graph.
+- `legacy/outfitter/profiles/` — transitional project-agnostic roles.
+- `legacy/outfitter/local/settings.yml` — ignored machine-local live source graph.
 - `docs/runbook/` — operational runbooks, starting with local development.
 - `README.md` — user-facing index.
 - `CONTRIBUTING.md` — scope rules and change standards.

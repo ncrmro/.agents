@@ -1,4 +1,5 @@
 # Machine-specific source overrides shared into local consumers.
 /local/
+/legacy/outfitter/local/
 
 *.generated-system-prompt.md

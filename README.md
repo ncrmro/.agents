@@ -22,9 +22,10 @@ Outfitter merges `profile_sources` **last-wins**: the *last* entry in the YAML l
 
 | Path | Purpose |
 | --- | --- |
-| `profiles/` | Project-agnostic roles (`founder`, `engineer`, `platform`, `researcher`) |
-| `settings.yml` | Portable source graph pinned to published GitHub revisions |
-| `local/settings.yml` | Ignored machine-local graph pointing at live checkouts (see runbook) |
+| `skills/` | Protocol-native personal skills shared across projects |
+| `legacy/outfitter/profiles/` | Transitional Outfitter 0.10 roles (`founder`, `engineer`, `platform`, `researcher`) |
+| `legacy/outfitter/settings.yml` | Portable source graph pinned to published GitHub revisions |
+| `legacy/outfitter/local/settings.yml` | Ignored machine-local graph pointing at live checkouts (see runbook) |
 | `AGENTS.md` | Agent orientation: precedence, source graph, layout |
 | `CONTRIBUTING.md` | Scope rules and change standards for committed changes |
 | `docs/runbook/agent.dotfile-development.md` | Adoption flow: personal `~/.agents` layer first, then local checkouts, then projects |
@@ -34,9 +35,9 @@ Outfitter merges `profile_sources` **last-wins**: the *last* entry in the YAML l
 
 **Adopting agent dotfiles from scratch** — follow the [adoption runbook](docs/runbook/agent.dotfile-development.md): personal layer first, then local checkouts, then projects.
 
-**Consume the published graph** — commit a `.outfitter/settings.yml` in your project with the pinned sources listed in [docs/runbook/local-development.md](docs/runbook/local-development.md#portable-consumer-configuration), keeping `ncrmro/.agents` last.
+**Consume the published graph** — commit a compatibility `.outfitter/settings.yml` in your project with pinned sources, keeping `ncrmro/.agents/legacy/outfitter/profiles` ahead of the project-local profile source.
 
-**Develop live** — follow the [local development runbook](docs/runbook/local-development.md) to point an ignored `.outfitter/local/settings.yml` at local checkouts, then validate with:
+**Develop live** — follow the [agent dotfile runbook](docs/runbook/agent.dotfile-development.md) to point an ignored `.outfitter/local/settings.yml` at local checkouts, then validate with:
 
 ```bash
 outfitter profile lint --strict

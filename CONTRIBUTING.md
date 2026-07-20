@@ -9,7 +9,7 @@ Committed changes here MUST be project-agnostic:
 - No hardcoded consuming project, company, customer, domain taxonomy, or machine-specific consumer path.
 - Define roles by reusable responsibilities and outcomes; project context lives in the consumer.
 - No credentials, tokens, sessions, transcripts, caches, generated prompts, or absolute machine paths.
-- Machine paths go in ignored `local/settings.yml`; published sources and reviewed refs in committed `settings.yml`.
+- Machine paths go in ignored `legacy/outfitter/local/settings.yml`; published sources and reviewed refs go in committed `legacy/outfitter/settings.yml` while Outfitter 0.10 remains supported.
 
 Consuming repositories are test environments, not sources of shared policy — generalize before committing here.
 
