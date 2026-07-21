@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://devenv.sh/devenv.schema.json
+inputs:
+  # Upstream nixpkgs-unstable, not devenv-nixpkgs/rolling: the rolling fork
+  # currently ships a broken ctranslate2 (hash mismatch) that breaks the
+  # whisperx build. nixpkgs-unstable builds/caches the whole torch stack.
+  nixpkgs:
+    url: github:NixOS/nixpkgs/nixpkgs-unstable

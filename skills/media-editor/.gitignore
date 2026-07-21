@@ -1,0 +1,4 @@
+# devenv build artifacts (devenv.lock is committed for reproducibility)
+.devenv/
+.devenv.flake.nix
+.direnv/
