@@ -34,6 +34,9 @@ in
   # docling/torch bundled wheels dlopen these at runtime.
   env.LD_LIBRARY_PATH = lib.makeLibraryPath wheelLibs;
 
+  # Load a gitignored `.env` (HF_TOKEN, OLLAMA_HOST overrides) if present.
+  dotenv.enable = true;
+
   enterShell = ''
     export PATH="$HOME/.local/bin:$PATH" # uv-installed docling lives here
     command -v docling >/dev/null 2>&1 || uv tool install docling

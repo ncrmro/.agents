@@ -117,8 +117,22 @@ user before pulling the large model.
 ## HF token (for whisperx diarization)
 
 pyannote's diarization weights are gated. Create a token at
-<https://hf.co/settings/tokens>, accept the terms at
-<https://hf.co/pyannote/speaker-diarization-3.1>, then `export HF_TOKEN=…`.
+<https://hf.co/settings/tokens> and accept the terms at
+<https://hf.co/pyannote/speaker-diarization-3.1>.
+
+Store it in a **gitignored `.env`** in the skill root (`.env` and `.env.*` are
+ignored; `.env.example` is the template):
+
+```bash
+cp .env.example .env
+# then set HF_TOKEN=hf_... in .env
+```
+
+Both the devenv (via `dotenv`) and `scripts/deps-doctor.sh` load `.env`
+automatically, so the token is available to `whisperx --diarize` without
+exporting it each session. `.env` can also override `OLLAMA_HOST`,
+`NEMOTRON_MODEL`, and `WHISPER_MODEL_DIR`. (A plain `export HF_TOKEN=…` still
+works too.)
 
 ## Verify
 

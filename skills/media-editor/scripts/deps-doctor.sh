@@ -22,6 +22,16 @@
 set -u
 
 # --------------------------------------------------------------------------
+# Local secrets/config: source a gitignored `.env` (HF_TOKEN, overrides) sitting
+# in the skill root, if present. devenv loads it too via dotenv; this covers
+# standalone runs. Values in .env take effect (they override the environment).
+# --------------------------------------------------------------------------
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+for _envf in "$_script_dir/../.env" "${DEVENV_ROOT:-/nonexistent}/.env"; do
+  if [ -f "$_envf" ]; then set -a; . "$_envf"; set +a; break; fi
+done
+
+# --------------------------------------------------------------------------
 # Config / args
 # --------------------------------------------------------------------------
 OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"

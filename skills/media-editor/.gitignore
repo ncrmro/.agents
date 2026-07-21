@@ -2,3 +2,8 @@
 .devenv/
 .devenv.flake.nix
 .direnv/
+
+# Local secrets / config (HF_TOKEN, OLLAMA_HOST overrides). Never committed.
+.env
+.env.*
+!.env.example
