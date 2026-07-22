@@ -39,8 +39,10 @@ needs an `HF_TOKEN` with the pyannote terms accepted.
 ## Standard pipeline
 
 1. **Inspect** — run `ffprobe` on the source recording before editing.
-2. **Transcribe** — follow `transcribe.md`. Use whisper.cpp for single-speaker
-   material; use whisperx `--diarize` when speaker attribution matters.
+2. **Transcribe** — follow `transcribe.md` and its "Order of operations":
+   whisper-cli first (GPU on AMD; single-speaker, subtitles, edit planning),
+   escalating to whisperx `--diarize` only when you need speaker labels — with
+   `--min_speakers/--max_speakers` when the count is known.
 3. **Plan the edit** — read the transcript and identify content boundaries: dead
    air, filler, retakes, mistakes, key moments. Build a timestamped edit plan
    with segment ranges, actions, speeds, and estimated output length.

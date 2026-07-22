@@ -15,6 +15,27 @@ Two engines, picked by the job:
 
 If a tool is missing, run `scripts/deps-doctor.sh` (see `setup-tools.md`).
 
+## Order of operations
+
+Try things in this order — stop as soon as the result is good enough:
+
+1. **Preflight** — `scripts/deps-doctor.sh`. For diarization, confirm `HF_TOKEN`
+   is set *and* the gated pyannote models are accepted (`README.md` → gated
+   models), or `--diarize` fails with a 403.
+2. **Transcribe with `whisper-cli` first** — it's GPU-accelerated on AMD via
+   Vulkan and is all you need for single-speaker audio, subtitles, and edit
+   planning. `ggml-large-v3` for accuracy, `base.en`/`small.en` for speed.
+3. **Escalate to `whisperx --diarize` only when you need speaker labels** (runs
+   on CPU here). Climb this ladder, stopping when attribution is right:
+   1. `whisperx <audio> --model small --diarize --hf_token "$HF_TOKEN"`.
+   2. Speakers collapsing into one `SPEAKER_00`? Add
+      `--min_speakers N --max_speakers N` when the count is known — **essential**
+      for close-mic'd voices recorded on one device.
+   3. Still rough? Raise `--model` (small → medium → large-v3) for better
+      embeddings and attribution.
+4. **Optional LLM post-pass** — send the diarized transcript to Ollama/nemotron
+   to name `SPEAKER_NN` from context, fix ASR typos, or summarize.
+
 ## Requirements
 
 - `ffmpeg` on PATH (audio extraction).
