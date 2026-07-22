@@ -67,8 +67,12 @@ whisperx <input> \
 - On this class of machine whisperx runs its torch models on **CPU** (GPU torch
   is out of scope), so it is slower than `whisper-cli` — reach for it only when
   diarization is actually needed.
-- Diarization requires `HF_TOKEN` and accepted pyannote terms; without them
-  whisperx still transcribes but `--diarize` fails.
+- Diarization requires `HF_TOKEN` **and** an account that has accepted the gated
+  pyannote model terms — a token alone yields a `GatedRepoError 403`. whisperx's
+  default `--diarize_model` is `pyannote/speaker-diarization-community-1`; pass
+  `--diarize_model pyannote/speaker-diarization-3.1` to use 3.1 instead (accept
+  it and its `pyannote/segmentation-3.0` dependency). See `README.md` → "gated
+  models". On AMD, whisperx runs on CPU (see `README.md` → GPU notes).
 
 ### Writing `transcript.md`
 
