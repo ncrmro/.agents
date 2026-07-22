@@ -63,7 +63,11 @@ whisperx <input> \
 ```
 
 - Output SRT/JSON carry `SPEAKER_00`, `SPEAKER_01`, … plus word-level timestamps.
-- `--min_speakers` / `--max_speakers` help when the count is known.
+- `--min_speakers` / `--max_speakers` help when the count is known — and often
+  are **necessary**: auto-clustering tends to under-segment close-mic'd voices
+  recorded on one device (they collapse into a single `SPEAKER_00`). If you know
+  it's two people, pass `--min_speakers 2 --max_speakers 2`. A larger `--model`
+  (e.g. `small`+) also improves separation.
 - On this class of machine whisperx runs its torch models on **CPU** (GPU torch
   is out of scope), so it is slower than `whisper-cli` — reach for it only when
   diarization is actually needed.
