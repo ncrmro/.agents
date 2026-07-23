@@ -7,6 +7,9 @@
 # Sections degrade gracefully when a tool (gh/tea) or convention is absent.
 set -uo pipefail
 
+# Plain stdout, never a pager — git/gh/tea all page on a tty otherwise.
+export GIT_PAGER=cat GH_PAGER=cat PAGER=cat
+
 main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 main=${main:-main}
 git fetch --quiet --tags 2>/dev/null || true
