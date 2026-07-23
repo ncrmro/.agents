@@ -27,9 +27,10 @@ Output sections map onto graph rows:
 
 github.com targets use gh; other hosts use tea (Forgejo/Gitea — make sure
 `tea login` has an account for that host). Local-only sections (git log,
-tags, docs/milestones/) need a checkout: they run against the current
-directory and are skipped when it isn't a clone of the target. Every
-section degrades gracefully when a tool or convention is absent.
+tags, docs/milestones/) need a checkout: the current directory when it is
+a clone of the target, else the conventional ~/repos/OWNER/REPO location;
+they are skipped when neither exists. Every section degrades gracefully
+when a tool or convention is absent.
 EOF
 }
 
@@ -49,8 +50,9 @@ case "${1:-}" in
     ;;
 esac
 
-# Local git sections only make sense when the cwd is (a clone of) the target.
-local_ok=
+# Local git sections need a checkout of the target: the cwd if it is a clone,
+# else the conventional ~/repos/<owner>/<repo> location.
+local_ok='' checkout=''
 if git rev-parse --git-dir >/dev/null 2>&1; then
   if [ -z "$repo" ]; then
     local_ok=1
@@ -58,6 +60,11 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
     origin=$(git remote get-url origin 2>/dev/null || true)
     case "$origin" in *"$repo"*) local_ok=1 ;; esac
   fi
+fi
+if [ -z "$local_ok" ] && [ -n "$repo" ] &&
+  git -C "$HOME/repos/$repo" rev-parse --git-dir >/dev/null 2>&1; then
+  cd "$HOME/repos/$repo" || exit 1
+  local_ok=1 checkout="$HOME/repos/$repo"
 fi
 
 # Forge CLI: gh for github.com, tea (Forgejo/Gitea) for everything else.
@@ -86,6 +93,7 @@ if [ -n "$local_ok" ]; then
   range=${last_tag:+$last_tag..}HEAD
 
   echo "## git"
+  [ -n "$checkout" ] && echo "- using checkout: $checkout"
   echo "- default branch: $main @ $(git log -1 --format='%h %s' "$main" 2>/dev/null || git log -1 --format='%h %s')"
   echo "- last release (bottom ◇): ${last_tag:-none} $(git log -1 --format='— %as' "$last_tag" 2>/dev/null)"
 
@@ -124,9 +132,9 @@ if [ -n "$local_ok" ]; then
   [ -n "$found" ] || echo "- none found"
 else
   echo "## git"
-  echo "- skipped: current directory is not a clone of ${repo:-a git repo};"
-  echo "  clone it to get ● rows, the bottom ◇, the predicted version, and"
-  echo "  docs/milestones/ dirs"
+  echo "- skipped: neither the current directory nor ~/repos/${repo:-<owner>/<repo>}"
+  echo "  is a clone of the target; clone it to get ● rows, the bottom ◇, the"
+  echo "  predicted version, and docs/milestones/ dirs"
 fi
 
 echo
