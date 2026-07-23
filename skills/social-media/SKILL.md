@@ -14,6 +14,11 @@ Templates (copy, never edit in place):
 - `assets/template.x.post.md` — a short-form X post or thread.
 - `assets/template.x.article.md` — a longform X article (course/roadmap style).
 
+`README.md` records the real posts these templates are modeled on and the
+three forms an idea takes (standalone article, post funneling to your own
+article, post framing someone else's longform) — read it when revising a
+template or deciding which form an idea wants.
+
 ## Where drafts live
 
 This skill is project-agnostic — run it from any repo or notes directory. Find
