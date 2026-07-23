@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# list-usb-devices — enumerate connected Espressif / ESP32 serial devices.
+#
+# Handles both wiring styles:
+#   • native-USB parts (ESP32-S3/C3/C6/H2) expose their own USB-Serial-JTAG and
+#     appear on /dev/ttyACM* — the by-id name carries the chip MAC.
+#   • older/classic parts (ESP32, ESP8266) sit behind a USB-UART bridge
+#     (CP210x / CH34x / FT232) and appear on /dev/ttyUSB*.
+#
+# Usage:
+#   list-usb-devices           list every attached board (no toolchain needed)
+#   list-usb-devices -i         also run `esptool chip_id` per port for the exact
+#                               chip (needs esptool on PATH — run in the devenv;
+#                               NOTE: resets the board, interrupting running fw)
+#   list-usb-devices -h         help
+#
+# Then flash/log a specific one:  fw-flash /dev/ttyACM1   ·   fw-logs /dev/ttyUSB0
+set -euo pipefail
+
+IDENTIFY=0
+case "${1:-}" in
+  -i|--identify) IDENTIFY=1 ;;
+  -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  "") ;;
+  *) echo "unknown arg: $1 (try -h)" >&2; exit 2 ;;
+esac
+
+# Classify a by-id symlink name into a human kind + coarse chip hint.
+classify() {
+  local name="$1"
+  case "$name" in
+    *Espressif*JTAG*|*USB_JTAG*) echo "native USB-JTAG|ESP32-S3/C3/C6/H2 (use -i)" ;;
+    *CP210*)                     echo "CP210x UART bridge|classic ESP32 / ESP8266" ;;
+    *CH34*|*CH910*|*QinHeng*)    echo "CH34x UART bridge|classic ESP32 / ESP8266" ;;
+    *FT232*|*FTDI*)              echo "FTDI UART bridge|classic ESP32 / ESP8266" ;;
+    *)                           echo "serial|unknown" ;;
+  esac
+}
+
+# Pull the trailing id (MAC for JTAG parts, serial for bridges) out of the name.
+extract_id() {
+  local name="$1"
+  if [[ "$name" =~ ([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}) ]]; then
+    echo "${BASH_REMATCH[1]}"                 # MAC
+  else
+    echo "$name" | sed -E 's/.*Controller_([0-9a-fA-F]+).*/\1/; s/-if.*//' | tail -c 17
+  fi
+}
+
+byid=/dev/serial/by-id
+found=0
+printf '%-13s  %-20s  %-18s  %s\n' PORT KIND ID CHIP-HINT
+printf '%-13s  %-20s  %-18s  %s\n' ----- ---- -- ---------
+
+if [[ -d "$byid" ]]; then
+  for link in "$byid"/*; do
+    [[ -e "$link" ]] || continue
+    name=$(basename "$link")
+    tty=/dev/$(basename "$(readlink -f "$link")")
+    IFS='|' read -r kind hint < <(classify "$name")
+    id=$(extract_id "$name")
+    printf '%-13s  %-20s  %-18s  %s\n' "$tty" "$kind" "$id" "$hint"
+    found=$((found + 1))
+    if [[ "$IDENTIFY" == 1 ]] && command -v esptool >/dev/null 2>&1; then
+      chip=$(esptool --port "$tty" --before default_reset --after hard_reset chip_id 2>/dev/null \
+             | grep -iE 'Detecting chip type|Chip is' | head -1 | sed 's/^/    → /')
+      [[ -n "$chip" ]] && echo "$chip"
+    fi
+  done
+fi
+
+# Catch any ACM/USB port not covered by a by-id symlink.
+for tty in /dev/ttyACM* /dev/ttyUSB*; do
+  [[ -e "$tty" ]] || continue
+  if ! ls -l "$byid"/* 2>/dev/null | grep -q "$(basename "$tty")\$"; then
+    printf '%-13s  %-20s  %-18s  %s\n' "$tty" "serial (no by-id)" "-" "unknown"
+    found=$((found + 1))
+  fi
+done
+
+echo
+if [[ "$found" == 0 ]]; then
+  echo "No serial devices found. Check the USB cable (must be data, not charge-only)"
+  echo "and permissions (dialout group / udev)."
+else
+  echo "$found device(s). Flash one with:  fw-flash <PORT>   ·   tail:  fw-logs <PORT>"
+  [[ "$IDENTIFY" == 0 ]] && echo "Add -i to confirm the exact chip via esptool (resets the board)."
+fi
