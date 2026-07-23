@@ -16,3 +16,8 @@ profile_sources:
     path: .outfitter
   # This repository's profiles intentionally override same-ID published defaults.
   - path: ./profiles
+default_agent: founder
+default_harness: pi
+sources:
+  - github: ai-outfitter/default-profiles
+    ref: v1.0.0
