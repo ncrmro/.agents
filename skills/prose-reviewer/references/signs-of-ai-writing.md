@@ -8,6 +8,11 @@
 > For general prose review the high-value sections are **Content**, **Language and grammar**,
 > **Style**, and **Communication intended for the user**. The **Markup**, **Citations**, and
 > **Edit summaries** sections mostly matter only for wiki/CMS content.
+>
+> Reviewer agents should not read this file directly: cleaned per-lens splits
+> (`content-tells.md`, `language-tells.md`, `style-tells.md`,
+> `communication-tells.md`) live beside it, regenerable from this copy. This
+> full copy is the vendored source of truth for provenance and re-derivation.
 
 "Wikipedia:AI writing" redirects here. For identifying comments in discussions, see [Wikipedia:Signs of AI-generated comments](https://en.wikipedia.org/wiki/Wikipedia%3ASigns_of_AI-generated_comments "Wikipedia:Signs of AI-generated comments"). For other uses, see [Wikipedia:Artificial intelligence resources](https://en.wikipedia.org/wiki/Wikipedia%3AArtificial_intelligence_resources "Wikipedia:Artificial intelligence resources").
 
