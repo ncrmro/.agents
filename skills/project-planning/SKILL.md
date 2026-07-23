@@ -1,6 +1,6 @@
 ---
 name: project-planning
-description: Plan and track project work as a git graph of commits — shipped history at the bottom, planned commits and the next release-please release stacked on top — rendered as an ASCII graph or a mermaid gitGraph. Use when planning a feature, milestone, or roadmap, laying out stacked PRs, writing or updating a PLAN.md or status report, or showing what's shipped vs what's next.
+description: Use when planning or iterating new work or to quickly get the state of one or more projects.
 ---
 
 # Project planning
@@ -19,20 +19,10 @@ Supporting material, read on demand:
 - `references/mermaid.md` — the same scenarios as mermaid gitGraph, plus
   renderer gotchas. Read before emitting any mermaid.
 - `assets/PLAN.template.md` — copy as the starting point for an on-disk plan.
-- `scripts/state.sh` — run from the target repo's root to gather current
-  state as graph-ready rows: last tag (bottom `◇`), shipped commits (`●`),
-  predicted next version, milestone dirs, open PRs with head → base (`◉`
-  lanes; base ≠ main means stacked), and forge milestones/issues (`○`
-  candidates). Works with gh (GitHub) or tea (Forgejo/Gitea), degrading
-  section by section. Takes `owner/repo` or a full forge URL to target
-  another repo — several at once for multi-repo projects; `--help` for
-  usage.
-
-## Project Repos
-
-~/repos/<username/org>
-- /<repo-name>/
-- /<repo-name>.worktrees/<feat,fix,chore,docs,milestone>/<branch-name>/
+- `scripts/state.sh` — gather a repo's current state as graph-ready rows.
+  Run from the repo root, or pass `owner/repo` / forge URLs (several at once
+  for multi-repo projects); `--help` covers targets, the section → glyph
+  mapping, and gh/tea forge support.
 
 ## The design language
 
@@ -58,11 +48,10 @@ Four rules:
 2. **Versions above unshipped work are predictions.** Compute them the way
    release-please will (see below) and mark them `(next)` / `(later)`.
 3. **Branches are parallel vertical lanes.** main is the leftmost column;
-   each PR or milestone branch is its own vertical lane to the right, forking
-   at a `├─╯` row that lines up with the commit it's based on. A stacked PR
-   steps one lane further right, forking from its parent PR's lane; a merged
-   branch closes with `├─╮` at its merge row. Annotate a lane once, on its
-   top commit: `PR #n  <head> → <base>`.
+   each PR or milestone branch is its own lane to the right, and a stacked
+   PR steps one lane further, forking from its parent PR's lane. Annotate a
+   lane once, on its top commit: `PR #n  <head> → <base>`. Drawing mechanics
+   (fork/merge rows, columns, alignment) live in `references/ascii.md`.
 4. **Update by promotion, never rewrite.** `○ → ◉` when the PR opens,
    `◉ → ●` when it lands (record the sha), below a `◇` when released. `○`
    lines are free to reorder, split, or drop; they become immutable only as
@@ -131,7 +120,8 @@ long-lived branch, while the milestone branch's **preview environment runs
 with the flag enabled**. Note the flag on the milestone boundary —
 `── milestone: billing foundation · flag: billing_v2 ──` — and draw the
 default-on flip as its own commit on main above the merge
-(`feat(billing): enable billing_v2 flag`).
+(`feat(billing): enable billing_v2 flag`). This section is canonical; the
+references carry only the notation.
 
 ## Where a plan lives
 
@@ -160,17 +150,28 @@ A project may span several repos in an org. Release lines are repo-scoped, so
 - The plan file is canonical in the project's lead repo; the other repos'
   plans (and the org report) point to it.
 
+## Project Repos
+
+```text
+~/repos/<username/org>
+- /<repo-name>/
+- /<repo-name>.worktrees/<feat,fix,chore,docs,milestone>/<branch-name>/
+```
+
+`scripts/state.sh` resolves `owner/repo` targets to a local checkout through
+this layout. Milestone readmes live in the repo at
+`docs/milestones/M<n>-<slug>/`, where `n` is `N` while the milestone is a
+draft/RFC and a number once actively tracked (grouping issues on the forge).
+
 ## Working the plan (the agent loop)
 
 1. **Plan** — run `scripts/state.sh` to gather what already exists: the
-   bottom `◇`, the `●` rows, open `◉` lanes, and milestone/issue groupings.
-   Milestone readmes conventionally live at `docs/milestones/M<n>-<slug>/`,
-   where `n` is `N` while the milestone is a draft/RFC and a number once
-   actively tracked (and grouping issues on the forge). Then enumerate the
+   bottom `◇`, the `●` rows, open `◉` lanes, and milestone/issue groupings
+   (repo layout and milestone dirs: see Project Repos). Then enumerate the
    commits that will land on main, dependency order first (bottom of the
-   graph upward), each as a real conventional commit message. Group into PRs:
-   stack dependent spans, lane parallel ones. Predict the version, draw the
-   `◇` on top.
+   graph upward), each as a real conventional commit message. Group into
+   PRs: stack dependent spans, lane parallel ones. Predict the version, draw
+   the `◇` on top.
 2. **Execute** — take the lowest `○`, implement it, commit with the plan line
    verbatim.
 3. **Promote** — `○ → ◉` when the PR opens; `◉ → ●` when it lands on main
@@ -181,3 +182,26 @@ A project may span several repos in an org. Release lines are repo-scoped, so
 5. **Report** — asked "what's shipped / what's next", render the graph in the
    medium at hand instead of writing a prose status paragraph. The graph is
    the status; prose is commentary around it.
+
+## User Personas
+
+Having a specific persona in mind helps keep project development focused and
+demonstrable.
+
+## Demos
+
+Projects SHOULD demo as early as possible with a well defined user persona in
+mind. Demos MUST have one or more channels declared to disseminate to. That
+is, before user features/milestones are implemented we should have a clear
+persona and demo in place, allowing us to think critically about the work
+being done, make informed adjustments, and present decisions around planning
+and scope against reality.
+
+## Platform Work
+
+Platform work's persona is the internal team responsible for maintaining and
+evolving the underlying infrastructure, tools, and shared services that
+support the development and delivery of user-facing features. It should
+always be committed separately from feature work and use `chore` type
+commits. These should be cherry-picked or merged via a pull request to main
+as soon as possible to improve velocity and developer experience.

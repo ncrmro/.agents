@@ -26,11 +26,10 @@ Two view modes:
 - Milestone boundaries ride the milestone branch's merge row:
   `├─╮  ── milestone: <name> ──`. In the flat release column, use a bare
   `│  ── milestone: <name> ──` separator instead.
-- Flagged milestones note their flag on the boundary row:
-  `── milestone: <name> · flag: <flag> ──`. The milestone branch's preview
-  environment runs with the flag enabled; main keeps it off by default so the
-  branch merges expeditiously. The default-on flip is its own commit on main,
-  above the merge.
+- Flagged milestones note their flag on the boundary row
+  (`── milestone: <name> · flag: <flag> ──`) and draw the default-on flip as
+  its own commit on main above the merge. Semantics: SKILL.md § Feature
+  flags.
 - Annotations (shas, PR labels, status) start at one consistent column per
   graph, two spaces past the graph's longest message row. Annotate a lane
   once, on its top commit: `PR #n  <head> → <base> · <status>`. Shipped rows
@@ -105,9 +104,8 @@ rebases on top.
 
 ## D. Milestones within a release
 
-A release may contain more than one milestone. Each milestone's work is a
-branch lane parallel to main; the milestone boundary is its merge row. The
-lower lane executes first.
+Each milestone's work is a branch lane parallel to main; the milestone
+boundary is its merge row. The lower lane executes first.
 
 ```text
 ◇  v0.4.0 (next)
@@ -126,11 +124,6 @@ lower lane executes first.
 ●  feat(auth): login form                 88c1f02
 ◇  v0.3.0 — 2026-07-18
 ```
-
-The billing milestone ships dark: its commits merge to main expeditiously
-with `billing_v2` off by default, the `feat/billing` preview environment runs
-with it enabled, and the default-on flip is its own commit on main above the
-merge.
 
 ## E. Multi-release roadmap
 

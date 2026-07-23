@@ -86,9 +86,9 @@ if [ -z "$host" ] || [ "$host" = github.com ]; then
   if command -v gh >/dev/null 2>&1; then
     if [ -n "$repo" ]; then
       forge=gh; gh_r=(-R "$repo")
-    elif gh repo view >/dev/null 2>&1; then
+    elif repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) &&
+      [ -n "$repo" ]; then
       forge=gh
-      repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)
     fi
   fi
 elif command -v tea >/dev/null 2>&1; then
@@ -100,7 +100,11 @@ fi
 if [ -n "$local_ok" ]; then
   main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
   main=${main:-main}
-  git fetch --quiet --tags 2>/dev/null || true
+  # One tag fetch per 10 minutes — repeated runs skip the network round-trip.
+  gitdir=$(git rev-parse --git-dir)
+  if [ -z "$(find "$gitdir/FETCH_HEAD" -mmin -10 2>/dev/null)" ]; then
+    git fetch --quiet --tags 2>/dev/null || true
+  fi
   last_tag=$(git tag --list 'v*' --sort=-v:refname | head -1)
   range=${last_tag:+$last_tag..}HEAD
 
@@ -153,12 +157,12 @@ echo
 echo "## open PRs (◉ lanes; base != main ⇒ stacked, one lane deeper)"
 case $forge in
   gh)
-    gh pr list ${gh_r[@]+"${gh_r[@]}"} --json number,title,headRefName,baseRefName,isDraft --template \
-      '{{range .}}- ◉ PR #{{.number}}  {{.headRefName}} → {{.baseRefName}}{{if .isDraft}} · draft{{end}} · {{.title}}{{"\n"}}{{end}}'
+    prs=$(gh pr list ${gh_r[@]+"${gh_r[@]}"} --json number,title,headRefName,baseRefName,isDraft --template \
+      '{{range .}}- ◉ PR #{{.number}}  {{.headRefName}} → {{.baseRefName}}{{if .isDraft}} · draft{{end}} · {{.title}}{{"\n"}}{{end}}')
+    printf '%s\n' "$prs"
     echo
     echo "## pending release PR (an open one means the next ◇ is staged)"
-    gh pr list ${gh_r[@]+"${gh_r[@]}"} --search 'release in:title' --json number,title --template \
-      '{{range .}}- PR #{{.number}} {{.title}}{{"\n"}}{{end}}'
+    printf '%s\n' "$prs" | grep -i 'release' || true
     ;;
   tea)
     tea pr list ${tea_r[@]+"${tea_r[@]}"} --output simple 2>/dev/null || echo "- tea failed — is a login configured for $host? (tea login add)"
@@ -174,12 +178,10 @@ case $forge in
   gh)
     gh api "repos/${repo:-{owner\}/{repo\}}/milestones?state=all" --jq \
       '.[] | "- \(.title) [\(.state)] — \(.open_issues) open / \(.closed_issues) closed"' 2>/dev/null
-    gh api "repos/${repo:-{owner\}/{repo\}}/milestones?state=open" --jq '.[].title' 2>/dev/null |
-      while IFS= read -r m; do
-        echo "  ### $m"
-        gh issue list ${gh_r[@]+"${gh_r[@]}"} --milestone "$m" --json number,title --template \
-          '{{range .}}  - ○ #{{.number}} {{.title}}{{"\n"}}{{end}}'
-      done
+    # One call for all open issues, grouped by milestone locally.
+    gh issue list ${gh_r[@]+"${gh_r[@]}"} --limit 200 --json number,title,milestone --jq \
+      'map(select(.milestone != null)) | group_by(.milestone.title) | .[]
+       | "  ### \(.[0].milestone.title)", (.[] | "  - ○ #\(.number) \(.title)")' 2>/dev/null
     ;;
   tea)
     tea milestones list ${tea_r[@]+"${tea_r[@]}"} --output simple 2>/dev/null || echo "- tea failed — is a login configured for $host?"

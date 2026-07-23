@@ -32,10 +32,9 @@ newest-on-top, matching the design language.
   instead. Release anchors keep release tags off milestone merges, so several
   milestones fit inside one release.
 - Flagged milestones carry the flag in the merge tag
-  (`tag: "milestone: billing foundation · flag: billing_v2"`): the branch's
-  preview environment runs with the flag on, main keeps it off by default so
-  the merge lands expeditiously, and the default-on flip is its own commit on
-  main above the merge.
+  (`tag: "milestone: billing foundation · flag: billing_v2"`), with the
+  default-on flip as its own commit on main above the merge. Semantics:
+  SKILL.md § Feature flags.
 - Label merges with the PR: `merge feat/auth-ui id: "PR #3"`.
 
 ## A. Release column (all on main)
@@ -91,9 +90,8 @@ gitGraph BT:
 
 ## D. Milestones within a release
 
-Two milestone branches inside one release span — a release may contain more
-than one milestone. Each milestone is a lane beside main; its merge carries
-the milestone tag.
+Two milestone branches inside one release span; each milestone is a lane
+beside main and its merge carries the milestone tag.
 
 ```mermaid
 gitGraph BT:
@@ -149,11 +147,7 @@ In planning views, the `◇ vX.Y.Z` anchor stands for it.
 
 | gotcha | detail |
 | --- | --- |
-| source order | oldest-first, always — `BT:`/`TB:` only change rendering |
-| `BT:` support | mermaid ≥ 11 (`TB:` ≥ 10.3); fall back to default LR if rejected |
 | unique `id:`s | duplicate id strings collide (ids also drive `cherry-pick`); real commit messages are naturally unique |
-| one `tag:` per commit | why releases get anchor commits — a milestone tag and a release tag can't share a commit |
 | no ghost commits | gitGraph can't draw dashed/"future" commits — planned-ness is the `○` glyph plus `type: HIGHLIGHT`, never color alone |
-| branch names | slashes are fine; quote a name that collides with a keyword (`branch "cherry-pick"`) |
-| merges | the merged branch must exist and have ≥ 1 commit; `merge <branch> id: "…" tag: "…" type: …` are all valid |
 | keep templates theme-free | omit `config:`/theme frontmatter for portability across renderers |
+| anything else | full gitGraph syntax (orientation versions, branch-name quoting, merge attributes) lives in the `mermaid` skill's `references/gitgraph.md` |
