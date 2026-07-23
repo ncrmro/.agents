@@ -24,11 +24,14 @@ Supporting material, read on demand:
   predicted next version, milestone dirs, open PRs with head → base (`◉`
   lanes; base ≠ main means stacked), and forge milestones/issues (`○`
   candidates). Works with gh (GitHub) or tea (Forgejo/Gitea), degrading
-  section by section.
+  section by section. Takes `owner/repo` or a full forge URL to target
+  another repo; `--help` for usage.
 
 ## Project Repos
 
-~/repos/<user/org>/<repo>
+~/repos/<username/org>
+- /<repo-name>/
+- /<repo-name>.worktrees/<feat,fix,chore,docs,milestone>/<branch-name>/
 
 ## The design language
 
