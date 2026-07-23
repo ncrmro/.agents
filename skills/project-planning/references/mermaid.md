@@ -73,7 +73,9 @@ gitGraph BT:
 
 ## C. Parallel PRs
 
-Independent branches both cut from main.
+Independent branches both cut from main. Both PRs (#4 `fix/logout → main`,
+#5 `feat/export → main`) are open, so no merges are drawn — the lanes just
+end, exactly like the ASCII form.
 
 ```mermaid
 gitGraph BT:
@@ -83,15 +85,14 @@ gitGraph BT:
   checkout main
   branch feat/export
   commit id: "○ feat(export): csv download" type: HIGHLIGHT
-  checkout main
-  merge fix/logout id: "PR #4"
-  merge feat/export id: "PR #5"
 ```
 
 ## D. Milestones within a release
 
 Two milestone branches inside one release span; each milestone is a lane
-beside main and its merge carries the milestone tag.
+beside main and its merge carries the milestone tag. gitGraph bases each
+lane on main's current tip (the previous merge), so branch points here are
+schematic — the ASCII fork rows carry the real bases.
 
 ```mermaid
 gitGraph BT:

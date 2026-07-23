@@ -1,6 +1,6 @@
 ---
 name: project-planning
-description: Use when planning or iterating new work or to quickly get the state of one or more projects.
+description: Plan and track work as a git graph of commits — ASCII or mermaid gitGraph with stacked PRs, milestones, and release-please releases on top. Use when planning or iterating new work or to quickly get the state of one or more projects.
 ---
 
 # Project planning
@@ -155,11 +155,12 @@ A project may span several repos in an org. Release lines are repo-scoped, so
 ```text
 ~/repos/<username/org>
 - /<repo-name>/
-- /<repo-name>.worktrees/<feat,fix,chore,docs,milestone>/<branch-name>/
+- /<repo-name>.worktrees/<feat,fix,chore,milestone>/<branch-name>/
 ```
 
-`scripts/state.sh` resolves `owner/repo` targets to a local checkout through
-this layout. Milestone readmes live in the repo at
+The worktree types are owned by the `subagent-delegation` skill — follow its
+list. `scripts/state.sh` resolves `owner/repo` targets to the primary
+checkout (`~/repos/<owner>/<repo>`). Milestone readmes live in the repo at
 `docs/milestones/M<n>-<slug>/`, where `n` is `N` while the milestone is a
 draft/RFC and a number once actively tracked (grouping issues on the forge).
 

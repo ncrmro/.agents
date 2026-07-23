@@ -92,11 +92,11 @@ above the shared base commit. Vertical order between open lanes is
 deliberately meaningless: parallel work is unordered.
 
 ```text
-│ ○  feat(export): csv download    PR #5  feat/export → main
+│ ○  feat(export): csv download  PR #5  feat/export → main
 ├─╯
-│ ◉  fix(auth): logout redirect    PR #4  fix/logout → main · in review
+│ ◉  fix(auth): logout redirect  PR #4  fix/logout → main · in review
 ├─╯
-●  feat(db): user table            a1b2c3d
+●  feat(db): user table          a1b2c3d
 ```
 
 When one lands, its lane collapses into the main column and the other
@@ -140,8 +140,8 @@ once branches exist or stacking is decided.
 ◇  v0.4.0 (next)
 │
 ○  feat(onboarding): signup wizard
-│ ◉  feat(api): token endpoint            PR #2  feat/api-tokens → main · in review
+│ ◉  feat(api): token endpoint          PR #2  feat/api-tokens → main · in review
 ├─╯
-●  feat(db): user table                   a1b2c3d   ← main
+●  feat(db): user table                 a1b2c3d   ← main
 ◇  v0.3.0 — 2026-07-10
 ```

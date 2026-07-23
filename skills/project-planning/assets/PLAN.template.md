@@ -11,9 +11,9 @@ updated: YYYY-MM-DD
 │
 ○  feat(<scope>): <second planned commit>
 ○  feat(<scope>): <first planned commit>
-│ ◉  feat(<scope>): <in-flight commit>       PR #_  <head> → main · in review
+│ ◉  feat(<scope>): <in-flight commit>     PR #_  <head> → main · in review
 ├─╯
-●  <most recent shipped commit>              <sha>   ← main
+●  <most recent shipped commit>            <sha>   ← main
 ◇  vX.Y.Z — YYYY-MM-DD
 ```
 
