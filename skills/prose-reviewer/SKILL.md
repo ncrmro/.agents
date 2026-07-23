@@ -56,12 +56,16 @@ keeps one voice in the final pass.
 | Lens | Reads | Hunts |
 | --- | --- | --- |
 | Content & substance | `references/content-tells.md` | Significance inflation ("stands as a testament"), puffery, vague attributions ("industry reports suggest"), superficial analysis, formulaic "challenges and future prospects" conclusions. |
-| Language & phrasing | `references/language-tells.md` | AI vocabulary ("delve", "showcase", "boasts", "vibrant"), copula avoidance ("serves as" for "is"), negative parallelisms ("not just X, but Y"), rule-of-three padding, elegant variation. |
+| Language & succinctness | `references/language-tells.md` | AI vocabulary ("delve", "showcase", "boasts", "vibrant"), copula avoidance ("serves as" for "is"), negative parallelisms ("not just X, but Y"), rule-of-three padding, elegant variation — plus plain wordiness: filler transitions, hedging, redundant qualifiers, sentences that say nothing, headers for two-sentence sections. |
 | Style & remnants | `references/style-tells.md` + `references/communication-tells.md` | Title case headings, boldface/em-dash/emoji overuse, inline-header lists, chat leakage ("I hope this helps"), placeholders, leftover machine artifacts. |
-| Clarity & voice | nothing | Wordiness, redundancy, hedging, filler transitions, headers for two-sentence sections, tone/terminology drift against the project's existing prose, audience fit, claims the project itself doesn't support. |
+| Duplication & voice | nothing — reads *all* target files whole | The same point stated more than once: intro/body/conclusion echoes, a summary restating what was just said, the same fact or pitch explained in two files, parallel sections that could merge. Also tone/terminology drift against the project's existing prose, audience fit, claims the project itself doesn't support. |
+
+Duplication needs the whole corpus in one head — a reviewer seeing a single file
+can't know the README already says it — so never shard the duplication lens
+across multiple agents.
 
 For a small target (one README, a few strings) two agents suffice: content +
-language, with the lead covering clarity while merging. Use all four for
+language, with the lead checking duplication while merging. Use all four for
 anything outward-facing (blog post, announcement, marketing page) or multi-file.
 
 ### 3. Merge, verify, apply
@@ -74,7 +78,10 @@ anything outward-facing (blog post, announcement, marketing page) or multi-file.
    genuinely the best phrasing.
 3. Apply the surviving fixes with normal edits, keeping diffs minimal and
    reviewable. Preserve the author's meaning and register; shorter is the
-   default direction.
+   default direction. For a duplicated point, keep the one instance where a
+   reader most needs it and delete the rest — don't blend two phrasings into a
+   third, and don't leave a stub ("as mentioned above") pointing at the
+   survivor.
 4. Anything that needs a fact the text doesn't contain (a real number, a real
    source, whether a claim is true) becomes a question for the user, not an
    invention.
