@@ -1,4 +1,13 @@
 # Machine-specific source overrides shared into local consumers.
 /local/
+/legacy/outfitter/local/
 
 *.generated-system-prompt.md
+
+# Tool-managed runtime state and downloaded source caches.
+/.deepwork/
+/cache/
+
+# Agent scratchpads are local execution state.
+TASKS.md
+SCRATCH.md
