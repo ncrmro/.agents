@@ -11,3 +11,7 @@
 # Agent scratchpads are local execution state.
 TASKS.md
 SCRATCH.md
+
+# devenv runtime state
+/.devenv/
+/.direnv/
