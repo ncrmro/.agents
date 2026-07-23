@@ -18,6 +18,8 @@ Usage:
                             https://github.com/owner/repo
                             https://codeberg.org/owner/repo
                             git@forge.example.com:owner/repo.git
+  state.sh TARGET TARGET…   several repos back to back — for projects that
+                            span repos in an org, one report per repo
   state.sh -h | --help      show this help
 
 Output sections map onto graph rows:
@@ -33,6 +35,16 @@ they are skipped when neither exists. Every section degrades gracefully
 when a tool or convention is absent.
 EOF
 }
+
+# Several targets: one isolated run per repo, back to back.
+if [ $# -gt 1 ]; then
+  rc=0
+  for t in "$@"; do
+    "$0" "$t" || rc=$?
+    echo
+  done
+  exit "$rc"
+fi
 
 host="" repo=""
 case "${1:-}" in

@@ -25,7 +25,8 @@ Supporting material, read on demand:
   lanes; base ≠ main means stacked), and forge milestones/issues (`○`
   candidates). Works with gh (GitHub) or tea (Forgejo/Gitea), degrading
   section by section. Takes `owner/repo` or a full forge URL to target
-  another repo; `--help` for usage.
+  another repo — several at once for multi-repo projects; `--help` for
+  usage.
 
 ## Project Repos
 
@@ -143,6 +144,21 @@ default-on flip as its own commit on main above the merge
 
 If a plan has several homes, the on-disk plan file is canonical; reports and
 issue bodies are snapshots of it.
+
+## Projects that span repos
+
+A project may span several repos in an org. Release lines are repo-scoped, so
+**never merge repos into one graph** — instead:
+
+- One graph per repo, stacked in the same report, each with its own `◇`
+  lines and version prediction.
+- Shared milestone names tie the graphs together: the same
+  `── milestone: <name> ──` boundary appears in every repo the milestone
+  touches (each with its own flag and preview environment).
+- Gather state back to back with one call:
+  `state.sh org/app org/api org/infra` prints one report per repo.
+- The plan file is canonical in the project's lead repo; the other repos'
+  plans (and the org report) point to it.
 
 ## Working the plan (the agent loop)
 
