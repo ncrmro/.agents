@@ -1,6 +1,6 @@
 ---
 name: esp-firmware
-description: Develop, build, flash, and debug ESPHome firmware for ESP32 boards (incl. S3 camera nodes) from a devenv-managed toolchain. Use when setting up an ESP32/ESPHome firmware directory, wiring a custom ESPHome component, flashing over USB or the browser (esp-web-tools/Improv), managing Wi-Fi/token secrets, or diagnosing a board that won't compile, connect, or upload.
+description: Develop, build, flash, provision, harden, and debug ESPHome firmware for ESP32 boards (including S3 camera nodes) from a devenv-managed toolchain. Use when setting up firmware, wiring custom upload components, flashing over USB or esp-web-tools/Web Serial, protecting browser-served binaries, managing runtime Wi-Fi/tokens, or diagnosing build, connection, reset, and upload failures.
 ---
 
 # ESP32 / ESPHome firmware
@@ -17,10 +17,12 @@ Supporting docs live next to this `SKILL.md`; read them only when needed:
   secrets bridge, quick-iterate scripts. Copy this to start a firmware dir.
 - `references/camera-uploader.md` — ESP32-S3 camera pin maps and the current
   ESPHome `camera::CameraListener` custom-component pattern for pushing JPEG
-  frames over HTTP, plus the two-I²C-bus gotcha.
+  frames over HTTP, plus the two-I²C-bus gotcha, bounded synchronous uploads,
+  watchdog handling, and server-side ingest limits.
 - `references/web-flasher.md` — browser flashing (esp-web-tools/Web Serial) and
   the per-device **auth-provisioning** pattern (flash a secret-free binary, then
-  write a device-key frame over serial).
+  write a device-key frame over serial), including protected static assets,
+  clean site-build integration, native-USB re-enumeration, and NVS persistence.
 - `scripts/list-usb-devices` — enumerate attached ESP32 boards (port, kind, MAC,
   chip). Run it when more than one board is plugged in so you flash the right port.
 
@@ -131,5 +133,7 @@ that confirms the device antenna, not the router.
 Flash from a web page over Web Serial with esp-web-tools, and provision each board
 with its **own** credentials at flash time so a fleet runs one secret-free binary.
 Full recipe — factory-bin path, manifest, install button, Improv Wi-Fi, and the
-provision-over-serial auth pattern (with the framed-blob wire format) — is in
-`references/web-flasher.md`. Requires Chrome/Edge on desktop + a secure context.
+provision-over-serial auth pattern (with the framed-blob wire format), protected
+static-asset routing, clean deployable builds, shared-token MVP handling, and
+synchronous-upload watchdog bounds — is in `references/web-flasher.md`. Requires
+Chrome/Edge on desktop + a secure context.

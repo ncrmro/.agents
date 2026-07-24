@@ -9,6 +9,31 @@ component.
 Requirements: **Chrome/Edge on desktop** (Web Serial is not in Safari/Firefox) and
 a **secure context** (https or `localhost`).
 
+## The non-negotiable browser-build rule
+
+**Any firmware image reachable from a web deployment must be secret-free.**
+Authenticating the install page is not enough: static assets are commonly served
+before application middleware, and a guessed `/firmware.bin` URL can bypass page
+auth. Even when the asset route is explicitly authenticated, secret-free
+construction is the defense against a routing regression, cache leak, or copied
+artifact.
+
+Keep two explicit definitions when operators also need convenient local burns:
+
+- a local USB YAML may consume gitignored `.env` → `secrets.yaml` values;
+- a browser-factory YAML and its entire include graph must contain no `!secret`
+  dependency, configured production Wi-Fi, fallback-AP secret, or service token.
+
+If ESPHome requires the browser factory to declare a network, use an
+uncredentialed bootstrap AP only to satisfy that schema and omit
+`captive_portal`, `web_server`, and `esp32_camera_web_server`. Serial
+provisioning does not need those listeners, and leaving them enabled exposes
+device or camera surfaces on a publicly knowable fallback network.
+
+Do not try to make one YAML silently switch trust modes based on which secrets
+happen to exist. Separate entrypoints make review and clean-CI enforcement
+straightforward.
+
 ## Part 1 — how flashing works
 
 1. **Build a single-file factory image.** ESPHome emits it at
@@ -78,6 +103,25 @@ Browser encoder (TS) and firmware decoder (C++) must compute the **same CRC-32**
 a mismatch is the usual bug. Send over the port after flashing; the firmware logs
 an ack (e.g. `provision frame accepted`) that the flasher waits for.
 
+A robust concrete contract is:
+
+```text
+magic      4 bytes     fixed ASCII
+version    1 byte
+length     4 bytes     unsigned big-endian JSON byte length
+payload    N bytes     UTF-8 JSON, hard-capped (for example 4 KiB)
+crc32      4 bytes     unsigned big-endian IEEE CRC-32
+trailer    1 byte      newline
+```
+
+Define exactly which bytes the CRC covers; `version + length + payload` is a
+good choice. Test the browser implementation against the standard
+`123456789 → 0xCBF43926` vector, round-trip a fixture, and corrupt one byte to
+prove rejection. The firmware state machine must reject unsupported versions,
+zero/oversized lengths, malformed JSON, invalid UTF-8 field lengths,
+non-HTTPS service URLs, embedded URL credentials, and tokens outside explicit
+bounds before changing any state.
+
 ### Firmware side (ESPHome)
 
 - A custom `external_components` component reads bytes from the logger UART /
@@ -86,6 +130,14 @@ an ack (e.g. `provision frame accepted`) that the flasher waits for.
   upload path reads `id(device_key)` etc. — no secret in the source.
 - Because Wi-Fi can ride the same frame, you can skip Improv; or keep Improv for
   Wi-Fi and use the frame only for the auth key. Either works.
+- ESPHome restoring string globals are polling components (normally one-second
+  persistence checks). After assigning their values, allow more than one poll
+  interval before rebooting (three seconds is comfortable), or explicitly
+  persist them. Save Wi-Fi through ESPHome's Wi-Fi preference API rather than
+  treating its internal storage like an ordinary string global.
+- Apply all values, save them, then emit one value-free acknowledgement. Never
+  log SSIDs, URLs containing credentials, tokens, the JSON body, or rejected
+  field contents. A warning may identify the failed field/category only.
 
 ### Browser side
 
@@ -94,12 +146,104 @@ an ack (e.g. `provision frame accepted`) that the flasher waits for.
   progress/log UI, then after flash **write the frame to the same `SerialPort`**
   and read until the ack. Keep frame encoding in a separate module so browser
   and firmware fixtures can verify the exact same bytes.
+- Current esp-web-tools `flash()` disconnects the transport after its hard reset.
+  Keep the selected `SerialPort`, wait for native USB to re-enumerate, then reopen
+  that same/granted VID+PID port at the application baud rate before writing the
+  provisioning frame. Do not pick the first remembered port when multiple ESPs
+  may be connected.
+- Fetch runtime credentials only after flashing, over an authenticated,
+  same-origin `POST` that returns `Cache-Control: no-store`; never put them in
+  HTML, DOM attributes, URLs, browser storage, or console output. Zero the
+  mutable frame bytes after the serial write.
+- Set an acknowledgement deadline and always cancel/release the reader and close
+  the application port. Clearing the mutable frame reduces accidental retention;
+  immutable JavaScript strings cannot be reliably wiped, so keep their lifetime
+  short and drop references immediately after provisioning.
+
+### Static asset routing
+
+For full-stack hosts that serve static files before the Worker/application
+router, configure `/firmware/*` to run the Worker first and proxy the asset only
+after session authorization. In Cloudflare Workers Static Assets this is
+`assets.run_worker_first: ["/firmware/*"]` plus an authenticated handler that
+calls the `ASSETS` binding. Keep the binary secret-free anyway.
+
+The authenticated asset response should override static caching with
+`Cache-Control: private, no-store`, add `Vary: Cookie`, and set
+`X-Content-Type-Options: nosniff`. Whitelist the exact manifest/binary names;
+do not turn the authenticated route into an arbitrary asset proxy.
+
+The provisioning endpoint should:
+
+- accept `POST` only;
+- require the operator session;
+- require the `Origin` header to exactly match the request origin;
+- return `Cache-Control: private, no-store` and `Pragma: no-cache`;
+- return a generic 503 when required server bindings are absent;
+- build image/service URLs server-side and return only the documented fields.
+
+### Clean deployable builds
+
+- Make the site build invoke the browser-firmware builder before bundling static
+  assets. Ignored generated artifacts must never be an undeclared prerequisite
+  left over from a developer machine.
+- Pin the same ESPHome/esptool versions locally and in CI, install/cache the
+  toolchain in the deployment job, and build from a clean checkout with no
+  `secrets.yaml`.
+- As defense in depth, scan the output binary for each sufficiently long
+  credential present in the local dotenv and fail before publishing on an exact
+  match. Give the manifest a content-derived version.
+- Run the scan after copying the exact factory image into the site's public
+  directory, remove both binary and manifest on a match, and scan every relevant
+  local/CI token name. Never print the credential being searched. A minimum
+  length avoids noisy matches for empty or trivial values.
+- A clean checkout must succeed without generated `manifest.json`,
+  `firmware.bin`, or `secrets.yaml`. Keep generated artifacts ignored, but make
+  the deploy build regenerate them deterministically.
+- If a credential-bearing image was ever public, take the asset offline first,
+  rotate every compiled credential (including Wi-Fi/fallback credentials), and
+  re-provision affected boards. A code-only fix does not end the incident.
 
 ### Simpler tiers (pick the least you need)
 
 - **No auth / public data:** shared bin, no frame. Fine for read-only telemetry.
-- **One shared token (MVP):** bake a single `Bearer` token via `!secret` and a
-  gitignored `.env` (see the main skill). One binary, one token — replace with
-  per-device keys later. This is the cheap starting point.
+- **One shared token (trusted-operator MVP):** keep the shared token server-side
+  and deliver it after flash through the authenticated/no-store provisioning
+  request and serial frame. Never bake it into a browser-served binary. Replace
+  it with per-device credentials before devices leave trusted operator custody.
 - **Per-device keys:** the frame flow above. Do this once a fleet or untrusted
   ingest makes a shared token unacceptable.
+
+## Synchronous HTTP and the ESPHome watchdog
+
+ESP-IDF DNS/TLS/HTTP calls are synchronous. A client timeout longer than
+ESPHome's task watchdog turns an ordinary network stall into a board reset. Give
+every uploader both:
+
+1. a bounded HTTP timeout appropriate to its payload; and
+2. a scoped `watchdog::WatchdogManager` allowance slightly wider than that
+   timeout, so the normal watchdog is restored immediately afterward.
+
+Test an unreachable DNS/TLS endpoint on hardware and verify that one cycle fails
+without a reboot.
+
+## End-to-end release checklist
+
+1. Validate both local and browser YAML entrypoints with `esphome config`.
+2. Build the browser entrypoint with no secret file in its include graph.
+3. Confirm the browser graph has no password, captive portal, generic web
+   server, or camera web server.
+4. Scan the emitted factory binary for every available real credential without
+   printing those values.
+5. Verify the manifest version is derived from the emitted binary hash.
+6. Build the consuming site from a clean checkout and confirm the binary copied
+   into its final static output has the same hash.
+7. Confirm firmware paths run through the authenticated application handler and
+   that unauthenticated direct requests fail.
+8. Flash and provision a physical native-USB board, including disconnect /
+   re-enumeration / reopen and a bounded acknowledgement.
+9. Stall DNS/TLS/image and telemetry endpoints independently; verify skipped
+   cycles rather than board resets.
+10. If an older credential-bearing image was ever reachable, deploy containment,
+    rotate every embedded credential, and re-provision affected boards. Treat
+    code completion and incident closure as separate milestones.

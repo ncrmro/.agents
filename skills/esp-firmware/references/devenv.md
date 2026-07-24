@@ -104,3 +104,33 @@ API_TOKEN=
 - The pip venv lands at `.devenv/state/venv`; `which esphome` should point there.
 - ESP-IDF `sdkconfig`/build cache is under `.esphome/build/<name>/` — gitignored;
   `esphome clean` (or `fw-clean`) drops it.
+
+## Calling firmware builds from a sibling site
+
+A website's shell often does not include the firmware directory's Python venv.
+That makes a site build work in CI (where ESPHome was installed globally) but
+fail locally with `esphome: command not found`, or vice versa. Make the firmware
+builder support both environments:
+
+```bash
+firmware_root="$(cd "$(dirname "$0")/.." && pwd)"
+
+if command -v esphome >/dev/null 2>&1; then
+  # CI or an already-active firmware shell.
+  esphome compile "$firmware_root/devices/browser-factory.yaml"
+elif command -v direnv >/dev/null 2>&1 &&
+     [[ -f "$firmware_root/.envrc" ]]; then
+  # A sibling application invoked us from its own environment.
+  direnv exec "$firmware_root" \
+    esphome compile "$firmware_root/devices/browser-factory.yaml"
+else
+  echo "ESPHome unavailable; activate the firmware .envrc" >&2
+  exit 127
+fi
+```
+
+Do not unconditionally require direnv: minimal CI runners may install pinned
+`esphome` and `esptool` directly. Conversely, do not assume the parent workspace
+devenv contains the firmware venv. Keep the pinned versions identical in the
+firmware devenv and deployment job, and cache pip plus PlatformIO/ESPHome state
+when clean builds would otherwise redownload the toolchain.
