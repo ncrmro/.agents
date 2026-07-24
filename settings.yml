@@ -1,6 +1,8 @@
 default_profile: founder
 profile_export: false
 profile_sources:
+  # Frozen pre-v1 compatibility snapshot — do not update these pins; the v1
+  # `sources` list below is canonical (see AGENTS.md "Migration compatibility").
   # Published baselines, ordered from lowest to highest precedence.
   - github: ai-outfitter/default-profiles
     ref: 6b2e61e9b8f6a3213abf0729a98b5c0617d08372

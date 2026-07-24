@@ -1,44 +1,40 @@
 # Shared agent configuration
 
-This repository is the canonical, project-agnostic composition layer for shared agent roles and Outfitter development resources. Consumers use it as an Outfitter settings source and keep their own domain context, skills, and operating rules locally.
+This repository is the canonical, project-agnostic Outfitter v1 layer for shared agents, skills, and development resources. It is linked at `~/.agents`; consuming projects keep domain context, skills, and operating rules in their own `.agents/` trees.
 
 - Contribution rules (scope, change standards): @CONTRIBUTING.md
-- Adoption flow (personal layer → local checkouts → projects): @docs/runbook/agent.dotfile-development.md
-- Machine setup, live source graph, validation, and publish workflow: @docs/runbook/local-development.md
+- Adoption flow, machine setup, live source overrides, and validation: @docs/runbook/agent.dotfile-development.md
 
-## Precedence: last entry wins
+## Native v1 precedence
 
-Outfitter merges `profile_sources` last-wins: the **last** entry in the YAML list is the **highest** precedence for same-ID profiles and skills. `ncrmro/.agents` is always listed last so personal roles and skills override everything else. New or modified resources start here, then trickle upstream: generalize them, move them to the owning repository, and behavior stays identical because this layer keeps overriding until the upstream version lands.
+Outfitter resolves resources from highest to lowest precedence: project `.agents/`, global `~/.agents/`, then `sources` in listed order. This repository is the global layer, so its agents and skills override configured remote catalogs. New or modified resources start here, then trickle upstream after they have proved reusable.
 
 ## Source graph
 
-Highest precedence first (note this is the **reverse** of YAML list order, where highest comes last):
+Highest precedence first:
 
-| Source | Published catalog root | Typical local source | Resources used here |
-| --- | --- | --- | --- |
-| `ncrmro/.agents` | `profiles/` | `~/repos/ncrmro/.agents/profiles` | Personal overrides and shared roles |
-| `ai-outfitter/actions` | `.outfitter/` | Primary checkout or a clean main worktree's `.outfitter/` | `outfitter-actions` skill |
-| `ai-outfitter/outfitter` | `.outfitter/` on current main | Checkout-dependent: `.outfitter/` on main; some development branches publish from `code/cli/` | Local `outfitter` skill |
-| `ai-outfitter/community-profiles` | `profiles/` | `~/repos/unsupervised/ai-outfitters/community-profiles/profiles` | Community roles such as `github-actions` |
-| `ai-outfitter/default-profiles` | `profiles/` | `~/repos/unsupervised/ai-outfitters/default-profiles/profiles` | Default roles and `pyramid-principle` |
+| Layer                           | Root                                                | Resources used here                    |
+| ------------------------------- | --------------------------------------------------- | -------------------------------------- |
+| Consuming project               | `<project>/.agents/`                                | Project-specific context and overrides |
+| `ncrmro/.agents`                | This repository                                     | Personal agents and skills             |
+| `ai-outfitter/default-profiles` | Repository root at the ref pinned in `settings.yml` | Published v1 defaults                  |
 
-The `founder` profile selects the local `outfitter` skill. The actions source exists for `outfitter-actions` development, but its checked-out skill uses glob references Outfitter 0.10.0 cannot materialize; select it only with a compatible Outfitter checkout or release.
+`settings.local.yml` may replace `sources` with local checkout paths for live development. Keep machine-specific paths out of committed settings.
 
-## Two equivalent source graphs
+## Migration compatibility
 
-RFC [ai-outfitter/outfitter#165](https://github.com/ai-outfitter/outfitter/issues/165) proposes replacing profile-era `.outfitter` configuration with the Dotagents `.agents` protocol; until it lands, treat profile-era files as transitional. This repository provides:
+Outfitter 1.x (1.0.2 or later) implements the native Dotagents model from [RFC #165](https://github.com/ai-outfitter/outfitter/issues/165). The active identities live in `agents/<slug>/agent.md`, and `settings.yml` uses `default_agent`, `default_harness`, and `sources`.
 
-1. `settings.yml` — pinned published GitHub revisions for portable consumers and CI.
-2. Ignored `local/settings.yml` — the same graph as live local checkouts for development.
-
-A consumer commits the flattened published graph, then writes its own ignored `.outfitter/local/settings.yml` for live edits. The local file MUST be a regular file, not a symlink, and it replaces `profile_sources` wholesale — Outfitter does not recursively load `settings.yml` from a profile source. Keep both graphs in the same precedence order. See the runbook for the concrete templates and commands.
+The `profiles/` files and legacy keys in `settings.yml` are a frozen compatibility snapshot for pre-v1 Outfitter: edit `agents/` and `skills/` only, do not sync changes back into the snapshot, and never make native v1 agents depend on it.
 
 ## Repository layout
 
-- `settings.yml` — portable, pinned remote source graph.
-- `profiles/` — project-agnostic roles owned by this repository.
-- `local/settings.yml` — ignored machine-local live source graph.
-- `docs/runbook/` — operational runbooks, starting with local development.
+- `agents/` — native v1 identities and their loadouts.
+- `skills/` — native v1 skills.
+- `settings.yml` — v1 defaults and published source graph.
+- `settings.local.yml` — ignored machine-local source overrides.
+- `profiles/` — frozen pre-v1 snapshot (see Migration compatibility).
+- `docs/runbook/` — adoption and local-development guidance.
 - `README.md` — user-facing index.
 - `CONTRIBUTING.md` — scope rules and change standards.
 - `*.generated-system-prompt.md` — ignored validation artifacts.

@@ -19,10 +19,10 @@ Former drafts: `docs/runbook/project.setup.md`, `project.mission-success.md`, `p
 Turn the personal-to-shared agent configuration workflow into one maintained skill and runbook:
 
 - Standardize checkout and worktree locations for personal resources and upstream Outfitter catalogs.
-- Preserve last-wins source precedence across portable pinned settings and ignored live-checkout settings.
+- Preserve v1 resource precedence across portable pinned settings and ignored live-checkout settings.
 - Keep machine paths local, generalize resources before promotion, and validate changes from a consumer before publishing upstream.
 - Teach agents to inspect existing layers, avoid disturbing unrelated checkout state, and report the exact source graph they validated.
-- Revisit the transitional Dotagents configuration represented by `default_agent: founder`, `default_harness: pi`, and the pinned `ai-outfitter/default-profiles` source once the profile-era migration settles.
+- Remove the retained pre-v1 profile files and settings keys after every remaining consumer runs Outfitter 1.x.
 
 Former drafts: `docs/runbook/environment.development.md`, `skills/local-agent-dotfiles/SKILL.md`, and `settings.yml`.
 

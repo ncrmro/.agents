@@ -13,39 +13,34 @@ Creating shareable agent dotfiles involves careful consideration to keep velocit
 
 ## How precedence works
 
-Outfitter merges `profile_sources` **last-wins**: the *last* entry in the YAML list is the *highest* precedence for same-ID profiles and skills. This repository is always listed last, so:
+Outfitter v1 resolves resources from project `.agents/`, then global `~/.agents/`, then configured `sources` in listed order. This repository is the global layer, so:
 
-- Personal roles and skills here override same-ID resources from every upstream catalog.
-- New or experimental resources start here, get validated in real consumers, then trickle upstream — generalize them, move them to the owning repository, and behavior stays identical because this layer keeps overriding until the upstream version lands.
+- Personal agents and skills here override same-ID resources from every upstream catalog.
+- New or experimental resources start here, get validated in real consumers, then trickle upstream — see [moving resources between layers](docs/runbook/agent.dotfile-development.md#moving-resources-between-layers).
 
 ## What's here
 
-| Path | Purpose |
-| --- | --- |
-| `profiles/` | Project-agnostic roles (`founder`, `engineer`, `platform`, `researcher`) |
-| `settings.yml` | Portable source graph pinned to published GitHub revisions |
-| `local/settings.yml` | Ignored machine-local graph pointing at live checkouts (see runbook) |
-| `AGENTS.md` | Agent orientation: precedence, source graph, layout |
-| `CONTRIBUTING.md` | Scope rules and change standards for committed changes |
+| Path                                        | Purpose                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `agents/`                                   | Native Outfitter v1 agents (`founder`, `engineer`, `platform`, `researcher`)         |
+| `skills/`                                   | Native v1 skills shared by those agents and consuming projects                       |
+| `settings.yml`                              | v1 defaults and published sources                                                    |
+| `settings.local.yml`                        | Ignored machine-local source overrides (see runbook)                                 |
+| `profiles/`                                 | Frozen pre-v1 snapshot (see `AGENTS.md`)                                             |
+| `AGENTS.md`                                 | Agent orientation: precedence, source graph, layout                                  |
+| `CONTRIBUTING.md`                           | Scope rules and change standards for committed changes                               |
 | `docs/runbook/agent.dotfile-development.md` | Adoption flow: personal `~/.agents` layer first, then local checkouts, then projects |
-| `docs/runbook/local-development.md` | Machine setup, live source graph, validation, publish workflow |
 
 ## Quick start
 
 **Adopting agent dotfiles from scratch** — follow the [adoption runbook](docs/runbook/agent.dotfile-development.md): personal layer first, then local checkouts, then projects.
 
-**Consume the published graph** — commit a `.outfitter/settings.yml` in your project with the pinned sources listed in [docs/runbook/local-development.md](docs/runbook/local-development.md#portable-consumer-configuration), keeping `ncrmro/.agents` last.
+**Use this repository globally** — link or clone it at `~/.agents`. Outfitter v1 resolves these agents automatically as the global layer; projects can add higher-precedence resources in `<project>/.agents/`.
 
-**Develop live** — follow the [local development runbook](docs/runbook/local-development.md) to point an ignored `.outfitter/local/settings.yml` at local checkouts, then validate with:
-
-```bash
-outfitter profile lint --strict
-outfitter profile list
-```
+**Develop live** — put machine-specific source paths in ignored `settings.local.yml`, then run `outfitter validate`; the full validation and inspection commands are in the [runbook](docs/runbook/agent.dotfile-development.md#step-2-point-at-local-development-checkouts).
 
 ## Upstream sources
 
-- [ai-outfitter/default-profiles](https://github.com/ai-outfitter/default-profiles) — default roles
-- [ai-outfitter/community-profiles](https://github.com/ai-outfitter/community-profiles) — community roles
-- [ai-outfitter/outfitter](https://github.com/ai-outfitter/outfitter) — the Outfitter CLI and its skill
-- [ai-outfitter/actions](https://github.com/ai-outfitter/actions) — `outfitter-actions` skill
+- [ai-outfitter/default-profiles](https://github.com/ai-outfitter/default-profiles) — published v1 defaults
+
+The frozen legacy profile graph in `settings.yml` also pins community-profiles, Outfitter, and Actions for pre-v1 clients.
