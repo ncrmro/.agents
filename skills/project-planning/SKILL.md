@@ -1,16 +1,23 @@
 ---
 name: project-planning
-description: Plan and track work as a git graph of commits — ASCII or mermaid gitGraph with stacked PRs, milestones, and release-please releases on top. Use when planning or iterating new work or to quickly get the state of one or more projects.
+description: Plan and track work as a projected git graph — the future git log drawn in ASCII or mermaid gitGraph, with stacked PRs, milestones, and release-please releases on top. Use when planning or iterating new work or to quickly get the state of one or more projects.
 ---
 
 # Project planning
 
-Agent-first planning: a plan is a future `git log`. Lay work out as the commits
-that will land on main, grouped into PRs (stacked or parallel), with the next
-release-please release at the top of the graph. One design language, two
-renderings — an ASCII graph for terminals and plain files, a mermaid gitGraph
-where markdown renders — and it lives anywhere text does: a plan file on disk,
-a committed report, an issue body, notes, or just displayed in chat.
+Agent-first planning: a plan is a **projected git graph** — the future `git log`,
+written before the work exists. Lay work out as the commits that will land on
+main, grouped into PRs (stacked or parallel), with the next release-please
+release at the top of the graph.
+
+The notation is deliberately not new. Engineers already read git graphs
+fluently — time flowing up, branches as lanes, merges as joins — so projecting
+a plan into that shape borrows a mental model they have already paid for
+instead of teaching a board or an issue tracker's idea of an epic. It is plain
+text, so it lives anywhere text does: a plan file on disk, a committed report,
+an issue body, notes, or displayed in chat. One design language, two renderings
+— an ASCII graph for terminals and plain files, a mermaid gitGraph where
+markdown renders.
 
 Supporting material, read on demand:
 
@@ -40,7 +47,7 @@ history.
 | `◇` | release boundary — a release-please tag; predictions marked `(next)` |
 | `── milestone: <name> ──` | milestone boundary — rides its branch's merge row `├─╮` in branch view; a bare separator in the flat release column |
 
-Four rules:
+Five rules:
 
 1. **Every line is a real conventional commit message** (`feat(scope): …`,
    `fix: …`). When the work is done, the plan line is used verbatim as the
@@ -57,6 +64,11 @@ Four rules:
    lines are free to reorder, split, or drop; they become immutable only as
    they become history. Shipped lines are never deleted — they are the
    "what's shipped" half of the story.
+5. **The planned commits are the commits that land.** A plan is only
+   executable if its lines survive onto main individually. Squash-merging a
+   planned span collapses them into one and destroys everything the plan
+   encoded. Decide the landing mode when you draw the graph and record it on
+   the plan — see [Landing the plan](#landing-the-plan).
 
 ## The two renderings
 
@@ -164,6 +176,72 @@ checkout (`~/repos/<owner>/<repo>`). Milestone readmes live in the repo at
 `docs/milestones/M<n>-<slug>/`, where `n` is `N` while the milestone is a
 draft/RFC and a number once actively tracked (grouping issues on the forge).
 
+## Landing the plan
+
+Git history is the project's memory, and written concisely it is
+**self-documenting**: `git log` answers "what happened, in what order, and
+why" without anyone maintaining a changelog. That only holds while the commits
+you planned are the commits that land.
+
+**Never squash-merge a planned span.** Squash collapses a stack of deliberate,
+individually-meaningful commits into one line and discards the sequence the
+plan encoded — the reasoning, the dependency order, and the ability to bisect,
+revert, or review one step at a time. Squash exists for branches of scratch
+commits (`wip`, `fix typo`, `address review`), which is the opposite of a plan.
+A large PR is not a reason to squash; it is the reason not to.
+
+Choose the landing mode when you draw the graph, and record it on the plan:
+
+| mode | when | effect on main |
+| --- | --- | --- |
+| **fast-forward** | the branch is already the history you want | its commits *become* main, shas unchanged, no merge commit |
+| **merge commit** (`--no-ff`) | a milestone branch whose grouping is worth keeping | every commit lands, plus one merge commit naming the milestone |
+| **squash** | scratch branches only — never a planned span | one commit; the plan is destroyed |
+
+### Fast-forwarding main to a working branch
+
+The cleanest landing, and the normal end state of working the loop: the branch
+already holds exactly the commits the graph drew, so main just moves to it.
+
+```bash
+git fetch origin
+git rebase origin/main        # make the branch a linear descendant
+git push origin HEAD:main     # fast-forward — no merge commit, shas preserved
+```
+
+**Stacked PRs are the motivating case.** Each PR in the stack is one clean
+span; squash-merging them one at a time yields one commit per PR and loses the
+inner detail. Instead let the stack accumulate on a single branch and
+fast-forward main to its tip once the whole stack is approved — or land
+bottom-up, fast-forwarding at each step. Same for a **milestone branch** that
+has collected many commits behind a flag: fast-forward, or `--no-ff` when the
+milestone boundary itself is worth a marker in the log.
+
+On a forge this means the merge button must be **"Rebase and merge"** or
+**"Create a merge commit"** for these branches. If the repo is configured
+squash-only, say so *before* planning a stack — a squash-only repo cannot hold
+a multi-commit plan, and that constraint changes how you group the work.
+
+### Recovering from an accidental squash
+
+The planned commits still exist on the original branch. Unpack them onto the
+squash's parent, replay anything that landed after, and replace the squash:
+
+```bash
+git checkout <branch>
+git rebase <squash-sha>^                  # real commits onto the squash's parent
+git cherry-pick <shas landed after the squash>
+git rev-parse HEAD^{tree}                 # MUST equal <squash-sha>^{tree}
+git push --force-with-lease=main:<current-main-sha> origin HEAD:main
+```
+
+Two non-negotiables. **Verify the resulting tree is byte-identical** to what
+main already has — that proves the rewrite changes history shape and no
+content. And **use `--force-with-lease`**, so the push refuses if someone moved
+main while you worked. Rewriting shared main changes the sha of any commit that
+landed on top of the squash; tell whoever authored those, and check for dirty
+worktrees on main before resetting them.
+
 ## Working the plan (the agent loop)
 
 1. **Plan** — run `scripts/state.sh` to gather what already exists: the
@@ -172,11 +250,16 @@ draft/RFC and a number once actively tracked (grouping issues on the forge).
    commits that will land on main, dependency order first (bottom of the
    graph upward), each as a real conventional commit message. Group into
    PRs: stack dependent spans, lane parallel ones. Predict the version, draw
-   the `◇` on top.
+   the `◇` on top. **Record the landing mode** and confirm the forge allows it
+   (see Landing the plan) — discovering a squash-only repo after the stack is
+   written is too late.
 2. **Execute** — take the lowest `○`, implement it, commit with the plan line
    verbatim.
 3. **Promote** — `○ → ◉` when the PR opens; `◉ → ●` when it lands on main
-   (record the short sha, drop the PR annotation).
+   (record the short sha, drop the PR annotation). Land by fast-forward or
+   merge commit so each `○` becomes its own `●`; if one `●` appears where the
+   plan drew several, the span was squashed — unpack it (see Landing the plan)
+   rather than editing the graph to match.
 4. **Cut** — when release-please merges the release PR, turn `vX.Y.Z (next)`
    into `vX.Y.Z — YYYY-MM-DD` and open a new `(next)` section above if more
    work is planned.
