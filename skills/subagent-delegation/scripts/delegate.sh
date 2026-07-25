@@ -1,26 +1,32 @@
 #!/usr/bin/env bash
-# Delegate a task to a headless agent working in its own git worktree.
+# Delegate one lane to a headless worker in its own git worktree.
 #
-#   delegate.sh <type>/<slug> "<task prompt>" [--agent claude|codex|outfitter]
-#                                             [--base <branch>]
-#                                             [--land direct|pr|none]
+#   delegate.sh <type>/<slug> "<task prompt>" [--agent codex|claude|outfitter]
+#                                             [--base <branch>]     # default origin/main
+#                                             [--land pr|direct|none]
+#                                             [--existing]          # reuse existing worktree/branch
 #                                             [--autonomous]
 #                                             [--no-close-tab]
 #
-# Pipeline (synchronous — the call blocks until the pipeline finishes):
-#   1. worktree   ../<project>.worktrees/<type>/<slug> off <base> (default main)
+# Pipeline (synchronous inside the script — the ORCHESTRATOR runs this script as
+# a background shell task and watches its log; see SKILL.md):
+#   1. worktree   ../<project>.worktrees/<type>/<slug> off <base> (fresh JIT cut,
+#                 or reused with --existing)
 #   2. TASKS.md   seeded from the skill's assets/TASKS.template.md
-#   3. agent      the chosen agent runs the task headless (-p / exec) in the worktree
-#   4. review     claude -p "/simplify" then claude -p "/code-review", in the worktree
-#   5. land       ASK per run (direct squash to main | PR + automerge | none)
-#   6. cleanup    remove the worktree, delete the merged branch, close the zellij tab
+#   3. worker     codex (sol model) by default, runs the task headless in the worktree
+#   4. gate       claude -p "/simplify", then claude -p "/code-review" in a fix
+#                 loop until a pass produces no new commits
+#   5. land       pr (squash-merged PR) | direct (squash to base) | none
+#   6. cleanup    remove the worktree, delete the merged branch, close zellij tab
 #
-# SAFETY: by default the worker keeps its normal approval prompts, so an
-# unattended run may pause or decline sensitive actions. Passing --autonomous
-# disables those approvals FOR THE WORKER ONLY, and only inside this throwaway
-# worktree — use it just for runs you are willing to leave unattended. Landing
-# never happens silently: it requires an explicit --land value or an interactive
-# choice, and defaults to leaving the branch unmerged.
+# Resume a stalled worker from the worktree instead of restarting the lane:
+#   codex:  codex exec resume --last -C <worktree>
+#   claude: (cd <worktree> && claude -p --resume)
+#
+# SAFETY: by default the worker keeps its normal approval prompts; --autonomous
+# disables them FOR THE WORKER ONLY inside this throwaway worktree. Landing is
+# never silent: it requires an explicit --land value or an interactive choice,
+# and defaults to leaving the branch unmerged.
 set -euo pipefail
 
 skill_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,12 +38,13 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # ---- args -------------------------------------------------------------------
 branch="${1:-}"; shift || true
 task="${1:-}"; shift || true
-agent=""; base="main"; land=""; autonomous=0; close_tab=1
+agent="codex"; base="origin/main"; land=""; autonomous=0; close_tab=1; existing=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --agent) agent="${2:-}"; shift 2 ;;
     --base) base="${2:-}"; shift 2 ;;
     --land) land="${2:-}"; shift 2 ;;
+    --existing) existing=1; shift ;;
     --autonomous) autonomous=1; shift ;;
     --no-close-tab) close_tab=0; shift ;;
     *) die "unknown argument: $1" ;;
@@ -50,24 +57,10 @@ case "$branch" in
   *) die "branch must be <type>/<slug> with type feat|fix|chore|milestone" ;;
 esac
 
-# ---- agent selection --------------------------------------------------------
-if [ -z "$agent" ]; then
-  if [ -t 0 ]; then
-    printf 'Which agent should do the work?\n  1) claude    (claude -p)\n  2) codex     (codex exec)\n  3) outfitter (outfitter run --agent claude)\n> ' >&2
-    read -r reply
-    case "$reply" in
-      1|claude) agent=claude ;;
-      2|codex) agent=codex ;;
-      3|outfitter) agent=outfitter ;;
-      *) die "unrecognized choice: $reply" ;;
-    esac
-  else
-    die "non-interactive: pass --agent claude|codex|outfitter"
-  fi
-fi
-
+# ---- worker invocation ------------------------------------------------------
 # Approval-bypass flags are opt-in via --autonomous and confined to the worker
 # in this throwaway worktree; the default keeps each agent's normal prompts on.
+codex_model="${CODEX_MODEL:-gpt-5.6-sol}"
 claude_auto=(); codex_auto=()
 if [ "$autonomous" = 1 ]; then
   claude_auto=(--permission-mode bypassPermissions)
@@ -76,8 +69,8 @@ fi
 run_agent() {
   local prompt="$1"
   case "$agent" in
+    codex)     codex exec -m "$codex_model" --sandbox workspace-write -C "$PWD" "${codex_auto[@]}" "$prompt" ;;
     claude)    claude -p "$prompt" "${claude_auto[@]}" ;;
-    codex)     codex exec "${codex_auto[@]}" "$prompt" ;;
     outfitter) outfitter run --agent claude -- -p "$prompt" "${claude_auto[@]}" ;;
     *) die "unknown agent: $agent" ;;
   esac
@@ -89,12 +82,16 @@ have claude || die "claude not found on PATH (needed for /simplify and /code-rev
 repo_root="$(git rev-parse --show-toplevel)" || die "not in a git repo"
 project="$(basename "$repo_root")"
 git -C "$repo_root" rev-parse --verify --quiet "$base" >/dev/null || die "base branch '$base' not found"
-if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
-  die "branch '$branch' already exists — pick another slug or clean it up first"
-fi
 worktree_rel="$repo_root/../$project.worktrees/$branch"
-echo "delegate: creating worktree $worktree_rel (branch $branch off $base)" >&2
-git -C "$repo_root" worktree add -b "$branch" "$worktree_rel" "$base"
+if [ "$existing" = 1 ]; then
+  [ -d "$worktree_rel" ] || die "--existing given but no worktree at $worktree_rel"
+else
+  if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
+    die "branch '$branch' already exists — pass --existing, or pick another slug"
+  fi
+  echo "delegate: creating worktree $worktree_rel (branch $branch off $base)" >&2
+  git -C "$repo_root" worktree add -b "$branch" "$worktree_rel" "$base"
+fi
 worktree="$(cd "$worktree_rel" && pwd)"   # normalize
 
 cleanup_done=0
@@ -114,20 +111,28 @@ close_zellij_tab() {
 }
 
 # ---- seed TASKS.md ----------------------------------------------------------
-if [ -f "$template" ]; then
+if [ -f "$template" ] && [ ! -f "$worktree/TASKS.md" ]; then
   cp "$template" "$worktree/TASKS.md"
   printf '\n- [ ] %s\n' "$task" >> "$worktree/TASKS.md"
 fi
 
 # ---- run the pipeline in the worktree --------------------------------------
+# The /code-review pass runs headless via claude -p: the code-review skill is
+# disable-model-invocation, so the slash command is the only scriptable entry.
+# Fix loop: re-run code-review until a pass adds no new commits (max 3 passes).
 (
   cd "$worktree"
   echo "delegate: [$agent] working the task..." >&2
   run_agent "$task"
   echo "delegate: /simplify" >&2
   claude -p "/simplify" "${claude_auto[@]}"
-  echo "delegate: /code-review" >&2
-  claude -p "/code-review" "${claude_auto[@]}"
+  for pass in 1 2 3; do
+    before="$(git rev-parse HEAD)"
+    echo "delegate: /code-review (pass $pass)" >&2
+    claude -p "/code-review" "${claude_auto[@]}"
+    [ "$(git rev-parse HEAD)" = "$before" ] && break
+    [ "$pass" = 3 ] && echo "delegate: code-review still churning after 3 passes — landing paused for review" >&2
+  done
 )
 
 if git -C "$worktree" diff --quiet "$base"...HEAD 2>/dev/null; then
@@ -138,9 +143,9 @@ fi
 # ---- land (asked each run; never a silent push) ----------------------------
 if [ -z "$land" ]; then
   if [ -t 0 ]; then
-    printf 'Land %s how?\n  1) direct  (squash-merge to %s and push)\n  2) pr      (open PR + gh automerge after CI)\n  3) none    (leave the branch, do not merge)\n> ' "$branch" "$base" >&2
+    printf 'Land %s how?\n  1) pr      (squash-merged PR; use for shared repos)\n  2) direct  (squash-merge to %s and push; personal repos only)\n  3) none    (leave the branch, do not merge)\n> ' "$branch" "$base" >&2
     read -r reply
-    case "$reply" in 1|direct) land=direct ;; 2|pr) land=pr ;; *) land=none ;; esac
+    case "$reply" in 1|pr) land=pr ;; 2|direct) land=direct ;; *) land=none ;; esac
   else
     echo "delegate: non-interactive and no --land given; leaving branch '$branch' unmerged." >&2
     land=none
@@ -148,8 +153,15 @@ if [ -z "$land" ]; then
 fi
 
 case "$land" in
+  pr)
+    git -C "$worktree" push -u origin "$branch"
+    ( cd "$worktree" && gh pr create --fill && { gh pr merge --squash || gh pr merge --squash --auto; } )
+    echo "delegate: PR squash-merge requested. If GitHub reports CONFLICTING, rebase in the worktree, re-gate, push --force-with-lease, and merge again." >&2
+    close_zellij_tab
+    ;;
   direct)
-    git -C "$repo_root" switch "$base"
+    local_base="${base#origin/}"
+    git -C "$repo_root" switch "$local_base"
     git -C "$repo_root" merge --squash "$branch"
     git -C "$repo_root" commit --no-edit
     git -C "$repo_root" push
@@ -157,15 +169,8 @@ case "$land" in
     git -C "$repo_root" branch -D "$branch" 2>/dev/null || true
     close_zellij_tab
     ;;
-  pr)
-    git -C "$worktree" push -u origin "$branch"
-    ( cd "$worktree" && gh pr create --fill && gh pr merge --squash --auto )
-    echo "delegate: PR opened with automerge; worktree kept until CI merges. Remove with:" >&2
-    echo "  git -C \"$repo_root\" worktree remove \"$worktree\"" >&2
-    close_zellij_tab
-    ;;
   none)
     echo "delegate: branch '$branch' left in place at $worktree" >&2
     ;;
-  *) die "unknown --land value: $land (want direct|pr|none)" ;;
+  *) die "unknown --land value: $land (want pr|direct|none)" ;;
 esac
