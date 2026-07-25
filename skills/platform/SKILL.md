@@ -56,7 +56,7 @@ Version and release repositories with release-please: Conventional Commits on th
 
 ## Agent configuration (.agents and Outfitter)
 
-Repositories keep agent-facing configuration in the `.agents` directory standard (skills, shared conventions), while Outfitter composes shared roles/profiles across repositories from a settings source graph. Read [`references/agents.dotfiles.md`](references/agents.dotfiles.md) for the layout, how Outfitter consumes it today, and the migration direction (Outfitter RFC #165).
+Repositories keep agent-facing configuration in the `.agents` directory standard (skills, agents, shared conventions, settings). Pi loads skills natively from `~/.agents/skills/` and project `.agents/skills/`; Outfitter treats `.agents/` as its authored configuration protocol, resolving workspace, global, and remote catalog layers before projecting them into harness-specific runtime config. Read [`references/agents.dotfiles.md`](references/agents.dotfiles.md) before changing `.agents`, Outfitter, or agent catalog configuration.
 
 For repositories where agents (or humans) should land PRs automatically once CI passes — the merge target for the `subagent-delegation` skill's `pr` land path — read [`references/automerge-merge-queues.md`](references/automerge-merge-queues.md): enabling `gh pr merge --auto`, the required branch-protection/ruleset gate, and when to add a merge queue.
 
