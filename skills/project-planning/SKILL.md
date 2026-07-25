@@ -10,14 +10,12 @@ written before the work exists. Lay work out as the commits that will land on
 main, grouped into PRs (stacked or parallel), with the next release-please
 release at the top of the graph.
 
-The notation is deliberately not new. Engineers already read git graphs
-fluently — time flowing up, branches as lanes, merges as joins — so projecting
-a plan into that shape borrows a mental model they have already paid for
-instead of teaching a board or an issue tracker's idea of an epic. It is plain
-text, so it lives anywhere text does: a plan file on disk, a committed report,
-an issue body, notes, or displayed in chat. One design language, two renderings
-— an ASCII graph for terminals and plain files, a mermaid gitGraph where
-markdown renders.
+The notation is deliberately not new — it borrows the model engineers already
+have instead of teaching a board or an issue tracker's idea of an epic. The
+graph is plain text, so it lives anywhere text does: a plan file on disk, a
+committed report, an issue body, notes, or a chat message. One design language,
+two renderings — an ASCII graph for terminals and plain files, a mermaid
+gitGraph where markdown renders.
 
 Supporting material, read on demand:
 
@@ -65,10 +63,10 @@ Five rules:
    they become history. Shipped lines are never deleted — they are the
    "what's shipped" half of the story.
 5. **The planned commits are the commits that land.** A plan is only
-   executable if its lines survive onto main individually. Squash-merging a
-   planned span collapses them into one and destroys everything the plan
-   encoded. Decide the landing mode when you draw the graph and record it on
-   the plan — see [Landing the plan](#landing-the-plan).
+   executable if its lines land on main individually; squash-merging a planned
+   span collapses them into one commit and loses the dependency order and the
+   per-step reasoning. Decide the landing mode when you draw the graph and
+   record it on the plan — see [Landing the plan](#landing-the-plan).
 
 ## The two renderings
 
@@ -178,49 +176,53 @@ draft/RFC and a number once actively tracked (grouping issues on the forge).
 
 ## Landing the plan
 
-Git history is the project's memory, and written concisely it is
-**self-documenting**: `git log` answers "what happened, in what order, and
-why" without anyone maintaining a changelog. That only holds while the commits
-you planned are the commits that land.
+Git history is the project's memory, and it documents itself when its commits
+are the units someone chose: `git log` answers what happened and in what order
+without anyone maintaining a changelog. That only holds while the commits you
+planned are the commits that land.
 
-**Never squash-merge a planned span.** Squash collapses a stack of deliberate,
-individually-meaningful commits into one line and discards the sequence the
-plan encoded — the reasoning, the dependency order, and the ability to bisect,
-revert, or review one step at a time. Squash exists for branches of scratch
-commits (`wip`, `fix typo`, `address review`), which is the opposite of a plan.
-A large PR is not a reason to squash; it is the reason not to.
+**Never squash-merge a planned span.** Squash collapses a stack of deliberate
+commits into one line and discards the sequence the plan encoded — the
+dependency order, the per-step reasoning, and the ability to bisect or review
+one step at a time. Squash exists for branches of scratch commits (`wip`,
+`fix typo`, `address review`) — the opposite of a plan. A large PR is not a
+reason to squash; it is the reason not to.
 
-Choose the landing mode when you draw the graph, and record it on the plan:
+Choose the mode when you draw the graph:
 
 | mode | when | effect on main |
 | --- | --- | --- |
-| **fast-forward** | the branch is already the history you want | its commits *become* main, shas unchanged, no merge commit |
-| **merge commit** (`--no-ff`) | a milestone branch whose grouping is worth keeping | every commit lands, plus one merge commit naming the milestone |
-| **squash** | scratch branches only — never a planned span | one commit; the plan is destroyed |
+| fast-forward | the branch is already the history you want | its commits *become* main, unchanged, no merge commit |
+| merge commit (`--no-ff`) | a milestone branch whose grouping is worth keeping | every commit lands, plus one merge commit naming the milestone |
+| squash | scratch branches only — never a planned span | one commit; the plan's granularity is gone |
 
 ### Fast-forwarding main to a working branch
 
 The cleanest landing, and the normal end state of working the loop: the branch
-already holds exactly the commits the graph drew, so main just moves to it.
+already holds exactly the commits the graph drew, so main moves to it.
 
 ```bash
 git fetch origin
 git rebase origin/main        # make the branch a linear descendant
-git push origin HEAD:main     # fast-forward — no merge commit, shas preserved
+git push origin HEAD:main     # fast-forward — the pushed commits are the commits on main
 ```
+
+The rebase rewrites shas; the push does not. What a fast-forward preserves is
+the commits themselves — no merge commit, nothing collapsed, nothing minted on
+the way in.
 
 **Stacked PRs are the motivating case.** Each PR in the stack is one clean
 span; squash-merging them one at a time yields one commit per PR and loses the
 inner detail. Instead let the stack accumulate on a single branch and
 fast-forward main to its tip once the whole stack is approved — or land
-bottom-up, fast-forwarding at each step. Same for a **milestone branch** that
-has collected many commits behind a flag: fast-forward, or `--no-ff` when the
-milestone boundary itself is worth a marker in the log.
+bottom-up, fast-forwarding at each step. Same for a milestone branch behind a
+flag: fast-forward, or `--no-ff` when the milestone boundary is worth a marker
+in the log.
 
-On a forge this means the merge button must be **"Rebase and merge"** or
-**"Create a merge commit"** for these branches. If the repo is configured
-squash-only, say so *before* planning a stack — a squash-only repo cannot hold
-a multi-commit plan, and that constraint changes how you group the work.
+On a forge, `Create a merge commit` gives the `--no-ff` shape. `Rebase and
+merge` keeps one commit per `○` but mints new shas, so any sha recorded beside
+a `●` will not survive it; a true fast-forward means pushing the branch to main
+directly. If the repo is squash-only, say so *before* planning a stack.
 
 ### Recovering from an accidental squash
 
@@ -235,12 +237,15 @@ git rev-parse HEAD^{tree}                 # MUST equal <squash-sha>^{tree}
 git push --force-with-lease=main:<current-main-sha> origin HEAD:main
 ```
 
-Two non-negotiables. **Verify the resulting tree is byte-identical** to what
-main already has — that proves the rewrite changes history shape and no
-content. And **use `--force-with-lease`**, so the push refuses if someone moved
-main while you worked. Rewriting shared main changes the sha of any commit that
-landed on top of the squash; tell whoever authored those, and check for dirty
-worktrees on main before resetting them.
+Four steps, none optional:
+
+1. Verify the resulting tree is identical to what main already has — that proves
+   the rewrite changed the shape of history, not the content.
+2. Use `--force-with-lease`, so the push refuses if someone moved main while you
+   worked.
+3. Tell whoever authored commits that landed on top of the squash: their shas
+   change.
+4. Check for dirty worktrees on main before resetting them.
 
 ## Working the plan (the agent loop)
 
@@ -251,8 +256,7 @@ worktrees on main before resetting them.
    graph upward), each as a real conventional commit message. Group into
    PRs: stack dependent spans, lane parallel ones. Predict the version, draw
    the `◇` on top. **Record the landing mode** and confirm the forge allows it
-   (see Landing the plan) — discovering a squash-only repo after the stack is
-   written is too late.
+   (see Landing the plan).
 2. **Execute** — take the lowest `○`, implement it, commit with the plan line
    verbatim.
 3. **Promote** — `○ → ◉` when the PR opens; `◉ → ●` when it lands on main

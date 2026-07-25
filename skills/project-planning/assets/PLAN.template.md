@@ -20,14 +20,12 @@ landing: fast-forward   # fast-forward | merge-commit — never squash a planned
 
 ## Landing agreement
 
-Every `○` above lands on main as its **own commit**. This span is
-fast-forwarded (or merged `--no-ff`), never squashed — the git log is the
-project's memory, and squashing a planned span erases it. Forge merge button
-for this branch: **Rebase and merge** / **Create a merge commit**.
+Every `○` above lands on main as its own commit, by the mode in this file's
+`landing:` field — never squashed.
 
-If one `●` appears where the plan drew several, the span was squashed: unpack
-it per the skill's "Recovering from an accidental squash" rather than rewriting
-this graph to match what landed.
+If one `●` appears where the plan drew several, the span was squashed: unpack it
+per the `project-planning` skill's recovery procedure rather than redrawing this
+graph to match what landed.
 
 ## Notes
 
