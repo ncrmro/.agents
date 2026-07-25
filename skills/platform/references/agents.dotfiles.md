@@ -1,48 +1,79 @@
-# The .agents standard, and how Outfitter works with it
+# The .agents standard, Pi skill discovery, and Outfitter
 
 ## The .agents directory standard (Dotagents)
 
-`.agents/` is the harness-neutral home for agent-facing configuration. It exists at two layers:
+`.agents/` is the harness-neutral home for agent-facing configuration. It exists at multiple layers:
 
-- **Workspace layer — `<project>/.agents/`**: the consuming repository's own domain skills and agent resources. This is where project-specific knowledge lives (e.g. a `wiki` or `research` skill tuned to that repo).
-- **Global layer — `~/.agents/`**: user/owner-wide shared configuration. Its canonical checkout on development machines is a repository under the standardized layout `~/repos/<owner>/.agents`, so the global layer is versioned, reviewable, and cloneable like any other repo.
+- **Workspace layer — `<project>/.agents/`**: the consuming repository's own domain skills, agents, settings, and resources. This is where project-specific knowledge lives.
+- **Global layer — `~/.agents/`**: user/owner-wide shared configuration used across repositories.
+- **Remote catalog layers**: pinned `.agents` repositories consumed by tools such as Outfitter.
+
+For this environment, the global-layer source repository is `github.com/ncrmro/.agents`, checked out under the standard repo layout at `~/repos/ncrmro/.agents`. Treat `~/.agents` as the runtime/install path; it may be managed by Home Manager or symlinked to generated files, so edit the source checkout rather than a generated or Nix-store copy.
 
 Layout inside a `.agents/` directory:
 
 ```text
 .agents/
-  AGENTS.md            # conventions for maintaining this directory/repo
+  agents.md            # shared operating context
+  system-prompt.md     # optional base system prompt
+  settings.yml         # Outfitter settings: defaults, sources, launch behavior
+  settings.local.yml   # ignored machine-private overrides (never committed)
+  mcp.json             # MCP server configuration
+  models.json          # model configuration
+  agents/
+    <id>/
+      agent.md         # identity + loadout; runnable directly or as a subagent
+      skills/          # optional skills private to this agent
   skills/
     <name>/
       SKILL.md         # frontmatter: name, description (the loading trigger)
       references/      # deep-dive docs the skill points to
       scripts/         # helper scripts the skill invokes
       assets/          # templates and other static material
-  profiles/            # transitional, Outfitter profile-era (see below)
-  settings.yml         # transitional, Outfitter source graph (see below)
-  local/               # ignored machine-private overrides (never committed)
+  knowledge/           # reference documents
+  commands/            # slash commands
 ```
 
 Conventions:
 
-- **`.agents/skills/` is canonical for skills.** Harnesses discover them natively (Claude Code loads `SKILL.md` frontmatter directly from `.agents/skills/`). A skill's `SKILL.md` stays short and operational; depth goes in `references/*.md`.
+- **`.agents/skills/` is canonical for reusable skills.** A skill's `SKILL.md` stays short and operational; depth goes in `references/*.md`.
 - **`AGENTS.md` is the agent-readable instruction file** at a repository root (and optionally per subproject). `CLAUDE.md` should be a symlink to `AGENTS.md` where Claude Code compatibility is needed — one source of truth, no drift.
-- **Shared (global-layer) content must be project-agnostic**: no consumer project names, company/customer specifics, machine-specific absolute paths, or credentials. Project specifics belong in the consuming repository's `.agents/` and `AGENTS.md`. Machine paths belong only in ignored `local/` settings.
+- **Shared/global content should stay project-agnostic**: no consumer project names, company/customer specifics, credentials, or machine-specific absolute paths. Project specifics belong in the consuming repository's `.agents/` and `AGENTS.md`; machine specifics belong only in ignored local settings.
+
+## Pi usage
+
+Pi implements the Agent Skills standard and discovers skills from both Pi-native and `.agents` locations. Relevant `.agents` locations are:
+
+- `~/.agents/skills/`
+- `.agents/skills/` in the current project and ancestor directories
+
+Pi scans these locations at startup, exposes skill names/descriptions to the model, and the agent loads the full `SKILL.md` on demand. Use `.agents/skills/<name>/SKILL.md` for skills intended to work across Pi, Claude Code, and Outfitter-mediated runs.
 
 ## How Outfitter works with it
 
-Outfitter composes shared agent roles ("profiles") across repositories. Today it is in a **transitional, profile-era architecture**: it authors and loads configuration from `.outfitter/` directories, while `.agents/` is already the canonical home for skills and shared-role sources.
+Outfitter is the toolchain for `.agents`: it resolves agent configuration from local and remote `.agents` trees, composes agents, skills, knowledge, MCP, models, and commands by slug, and launches the result through wrapped harnesses such as Pi or Claude Code.
 
-- **Consumer side**: a consuming repository commits `.outfitter/settings.yml` declaring a `default_profile` and its settings sources — either `remote_settings` pinning a published catalog (a GitHub repo + reviewed ref, e.g. an owner's `.agents` repository) or `profile_sources` paths. It ignores `.outfitter/local/` and `*.generated-system-prompt.md`.
-- **Catalog side**: a shared catalog (such as the global-layer `.agents` repo) provides `settings.yml` with an ordered `profile_sources` list — lowest to highest precedence; later sources override same-ID resources. Typical graph: published default profiles → community profiles → tool-owned skills → the owner's `profiles/` as the highest-precedence layer.
-- **Live development**: an ignored `local/settings.yml` mirrors the published graph with absolute paths to local checkouts; consumers symlink it into `.outfitter/local/settings.yml` for live edits, and remove it to test the published graph. Paths use shell-expanded `$HOME` (Outfitter does not expand `~`).
-- **Profiles** are YAML roles (`id`, `label`, `inherits`, `controls`) that can append system-prompt text and select skills by id. Skill selection from `.agents/skills/` is intentionally left disabled in profiles for now — those skills load natively via the harness — pending Outfitter's `.agents` support.
-- **Validation loop**: `outfitter profile lint --strict`, `outfitter profile list`, launch the affected profile, then `outfitter sync` to exercise the published graph after bumping pinned refs.
+Outfitter does not own a separate authored configuration format. The `.agents/` tree is the source of truth: useful without Outfitter, committed and reviewed like code, and shared through personal, project, organization, or community catalogs.
 
-## Migration direction
+Layer precedence is:
 
-Outfitter RFC [ai-outfitter/outfitter#165](https://github.com/ai-outfitter/outfitter/issues/165) proposes replacing the profile-era `.outfitter/` configuration with the Dotagents `.agents` protocol: `~/.agents/` as the global layer and `<project>/.agents/` as the workspace overlay. Until it lands:
+1. `<project>/.agents/`
+2. `~/.agents/`
+3. pinned remote catalogs
 
-- treat `profiles/`, `settings.yml`, and `.outfitter/` as transitional artifacts that will require deliberate migration;
-- keep new durable content (skills, references, conventions) in `.agents/` form so it survives the migration unchanged;
-- keep the published (`settings.yml`) and live (`local/settings.yml`) source graphs equivalent and in the same precedence order.
+Standalone `.agents` repositories — where the repository root is the payload — are the normal way to develop and share reusable layers. In this setup, `ncrmro/.agents` is both the personal global catalog and the source repo for the installed `~/.agents` layer.
+
+When you encounter old `.outfitter/` profile-era configuration, migrate it to `.agents/` rather than extending it.
+
+## Validation loop
+
+After changing `.agents` resources or Outfitter settings:
+
+```bash
+cd ~/repos/ncrmro/.agents
+outfitter validate --strict
+outfitter list agents
+outfitter list skills
+```
+
+For a consuming repository, validate from that repository so Outfitter sees the effective workspace + global + remote layer composition.
