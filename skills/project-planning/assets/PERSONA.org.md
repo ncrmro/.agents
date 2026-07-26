@@ -14,6 +14,8 @@ scripts/personas.sh --roles-from ... --orgs-from docs/personas/PERSONA.org.md \
 ```
 
 Copy this file to `docs/personas/PERSONA.org.md` and replace the examples.
+If the project has a wiki, harvest first: `organizations/` notes and the
+`affiliation:` field of `people/` notes are org fragments already researched.
 
 ## national space agency
 

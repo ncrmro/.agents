@@ -337,6 +337,25 @@ to know whether a page survives scepticism rather than ignorance: the same role
 and org with a burned bio and a green bio will disagree, and that disagreement
 is the signal.
 
+**Harvest the fragments you already have.** A project or org wiki usually
+carries `people/` and `organizations/` notes, and those are persona fragments
+already written by someone who did the research — a person note's `role:` is a
+role block, its `affiliation:` or the org note it links is an org block, and
+its body is bio material. Composing from them beats inventing, because the
+roles are ones that actually exist and the orgs actually behave the way the
+note says.
+
+A persona built this way is a **real-world match**, not a `scenario` — say so
+in its Status row, and keep the boundary the wiki keeps: a real person in
+`people/` is not a customer, a contact, or a quote. The persona models *how
+someone like them reacts*; it is never evidence of a relationship or of demand,
+and nothing it "says" may be attributed to the person. Where the wiki tracks a
+relationship stage, the persona inherits it rather than upgrading it.
+
+The loop runs both ways. What a persona run surfaces — the objection you did
+not expect, the comparison you keep losing to — belongs back in the wiki note
+that sourced it, so the next matrix starts better informed.
+
 ### `docs/requirements/`
 
 Formal, numbered obligations as `<PREFIX>-NNN-<topic>.md`, RFC 2119 throughout

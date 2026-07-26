@@ -14,6 +14,9 @@ Bios are the axis to vary when you want to know whether a page survives
 and a green bio will disagree, and the disagreement is the signal.
 
 Copy this file to `docs/personas/PERSONA.bio.md` and replace the examples.
+If the project has a wiki, the body of a `people/` note is bio material — but
+a persona sourced from a real person is a **real-world match**, never evidence
+of a relationship, and nothing it says may be attributed to them.
 
 ## burned by a quiet slip
 

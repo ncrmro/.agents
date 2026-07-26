@@ -9,6 +9,8 @@ Prose outside a `##` entry — like this paragraph — is ignored, as is anythin
 inside an HTML comment, so keep notes wherever they help.
 
 Copy this file to `docs/personas/PERSONA.role.md` and replace the examples.
+If the project has a wiki, harvest first: a `people/` note's `role:` field is
+a role fragment someone already researched.
 
 ## flight director
 
