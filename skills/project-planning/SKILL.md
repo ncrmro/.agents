@@ -313,6 +313,30 @@ scripts/personas.sh \
   --out docs/personas            # 2 × 3 × 2 = 12 personas; --dry-run to preview
 ```
 
+Keep the fragments themselves as **building blocks** rather than in shell
+history — [`assets/PERSONA.role.md`](assets/PERSONA.role.md),
+[`assets/PERSONA.org.md`](assets/PERSONA.org.md), and
+[`assets/PERSONA.bio.md`](assets/PERSONA.bio.md), copied into `docs/personas/`
+and edited in place. Each `## ` heading is one fragment: the body beneath it,
+or the heading itself when there is no body, so a one-word role and a
+five-sentence bio share one file format. Preamble prose and HTML comments are
+ignored, which lets the library explain itself and park a fragment without
+deleting it.
+
+```sh
+scripts/personas.sh \
+  --roles-from docs/personas/PERSONA.role.md \
+  --orgs-from  docs/personas/PERSONA.org.md --org "" \
+  --bios-from  docs/personas/PERSONA.bio.md \
+  --out docs/personas
+```
+
+File and inline fragments combine, so the `--org ""` above adds the
+unaffiliated variant alongside the library's orgs. Vary **bios** when you want
+to know whether a page survives scepticism rather than ignorance: the same role
+and org with a burned bio and a green bio will disagree, and that disagreement
+is the signal.
+
 ### `docs/requirements/`
 
 Formal, numbered obligations as `<PREFIX>-NNN-<topic>.md`, RFC 2119 throughout
