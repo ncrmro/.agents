@@ -271,19 +271,129 @@ Four steps, none optional:
    medium at hand instead of writing a prose status paragraph. The graph is
    the status; prose is commentary around it.
 
-## User Personas
+## Project steering documents
 
-Having a specific persona in mind helps keep project development focused and
-demonstrable.
+The graph says what will land and in what order. It does not say who the work
+is for, what the project is obliged to do, what a shippable slice looks like,
+or what this quarter is meant to achieve. Four document families under `docs/`
+answer those, and they nest — a report scopes milestones, a milestone scopes
+requirements, requirements are written for a persona:
 
-## Demos
+```text
+docs/
+├── personas/                 who the work is for
+├── requirements/             what the project is obliged to do (RFC 2119)
+├── milestones/M<n>-<slug>/   a demoable slice, written as its announcement
+└── reports/YYYY-MM-QN-*.md   what a period is meant to achieve; dated snapshots
+```
 
-Projects SHOULD demo as early as possible with a well defined user persona in
-mind. Demos MUST have one or more channels declared to disseminate to. That
-is, before user features/milestones are implemented we should have a clear
-persona and demo in place, allowing us to think critically about the work
-being done, make informed adjustments, and present decisions around planning
-and scope against reality.
+A plan line that cannot be traced up this stack — no persona, no requirement,
+no milestone — is a plan line worth questioning before it is worth writing.
+
+### `docs/personas/`
+
+One file per persona, from [`assets/PERSONA.template.md`](assets/PERSONA.template.md):
+a **role**, an **optional org**, and a **bio**. That is the whole schema; the
+bio carries everything that makes the persona behave like a person rather than
+a label — what they already believe, what they will not tolerate, what they
+compare you against.
+
+Personas are cheap and worth having in quantity, because the interesting
+feedback comes from the *matrix*: the same role at a different org, or the same
+org with a different level of experience, reacts differently to the same page.
+[`scripts/personas.sh`](scripts/personas.sh) composes atomic `--role`, `--org`,
+and `--bio` fragments into every variant so a deep matrix costs one command:
+
+```sh
+scripts/personas.sh \
+  --role "flight director" --role "procurement lead" \
+  --org "national space agency" --org "commercial operator" --org "" \
+  --bio "twenty years of crewed ops; distrusts anything without a margin" \
+  --bio "first program; optimises for defensible paperwork" \
+  --out docs/personas            # 2 × 3 × 2 = 12 personas; --dry-run to preview
+```
+
+### `docs/requirements/`
+
+Formal, numbered obligations as `<PREFIX>-NNN-<topic>.md`, RFC 2119 throughout
+— see [`assets/REQUIREMENT.template.md`](assets/REQUIREMENT.template.md) and the
+governing [`assets/REQUIREMENTS-README.template.md`](assets/REQUIREMENTS-README.template.md)
+(structure follows `ai-outfitter/outfitter`'s `docs/requirements/`). The parts
+that matter:
+
+- **Stable identity.** `<PREFIX>-NNN.M` numbers are permanent. Never renumber,
+  never reassign. A withdrawn statement is replaced in place with
+  `REQUIREMENT REMOVED (YYYY-MM-DD): <rationale>`; new statements append.
+- **Traceability to tests.** A machine-verifiable requirement is pinned by a
+  test carrying `THIS TEST VALIDATES A HARD REQUIREMENT (<PREFIX>-NNN.M)`, and
+  those tests say they must not be modified unless the requirement changes.
+- **Amend the requirement first.** When reality and a requirement disagree,
+  edit the requirement with an `Amendment (YYYY-MM-DD): ...` note, *then* the
+  pinned tests, *then* the implementation — landing together, so the diff
+  carries the whole trace. The amendment note is what authorises touching a
+  "must not modify" test.
+- **One scope per file.** If a document needs "and" in its title, it is two.
+
+Prefixes are per-subject, not per-repo: a repo may hold `OFTR-*` alongside
+`CNTP-*` and `ORDR-*`. Requirements for a reusable package live with that
+package (`code/<pkg>/docs/requirements/`), so the package can be extracted
+without orphaning its contract.
+
+### `docs/milestones/M<n>-<slug>/`
+
+A milestone is a **demoable slice of user or business value, written as its own
+announcement** — see [`assets/MILESTONE.template.md`](assets/MILESTONE.template.md).
+Lead with the press release: the headline, the paragraph a customer would read,
+the quote you could honestly give. If that paragraph cannot be written without
+lying, the milestone is not scoped yet.
+
+`n` is `N` while the milestone is a draft/RFC and a number once actively
+tracked (grouping issues on the forge). A milestone **scopes requirements** —
+it names which `<PREFIX>-NNN.M` statements it satisfies — and it **declares its
+demo**: the persona who watches, the channel it goes out on, and the script.
+Demo before implementation, so scope meets reality early; a milestone with no
+declared channel is a milestone nobody will see.
+
+Milestone work ships dark behind a flag (see [Feature flags](#feature-flags)),
+which is what lets the demo exist before the feature is on for everyone.
+
+### `docs/reports/`
+
+Dated snapshots: `YYYY-MM-QN-<topic>.md`, with the quarter prefix preferred for
+the planning bundle — `2026-07-Q3-plan.md`, `2026-07-Q3-financials.md`,
+`2026-07-Q3-research.md`. The Q-plan states **what this quarter is meant to
+accomplish**, which milestones serve it, and what is explicitly out.
+
+Reports are **frozen when committed**. Later evidence does not rewrite a
+report; it earns a dated addendum or a new report. Read the newest bundle
+before planning substantial work — the graph you draw should serve the quarter
+someone already committed to, or say plainly that it does not.
+
+### Trying the product as a persona
+
+Steering documents go stale unless someone uses the thing. Two scripts close
+that loop by putting a persona in front of the running product:
+
+- [`scripts/try-product.sh`](scripts/try-product.sh) launches headless Chrome
+  with remote debugging on a page and prints the instruction block for the
+  agent to *use* the product in character — then report first impression,
+  what it tried, where it got stuck, and what it would tell the team.
+- [`scripts/page-feedback.sh`](scripts/page-feedback.sh) captures a page
+  screenshot and prints the instruction block for the agent to read the image
+  and critique it as the persona.
+
+```sh
+scripts/try-product.sh http://localhost:4321/missions \
+  --persona docs/personas/flight-director-national-space-agency.md \
+  --task "decide whether you would approve this burn"
+
+scripts/page-feedback.sh http://localhost:4321/investors \
+  --persona docs/personas/procurement-lead.md --out /tmp/investors.png
+```
+
+Feedback from these runs is commentary until it changes a document: it belongs
+in a persona's bio, a requirement, a milestone's demo script, or a report
+addendum. Otherwise it evaporates.
 
 ## Platform Work
 
