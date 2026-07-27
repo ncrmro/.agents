@@ -6,6 +6,15 @@ mcp:
 extensions:
   - git:github.com/ai-outfitter/chapters
   - git:github.com/ai-outfitter/deepwork
+  - npm:@juicesharp/rpiv-ask-user-question
+  - git:github.com/ai-outfitter/ulta-tasklist
+  - npm:pi-nolo
+  - npm:pi-browser-harness
+  - npm:pi-subagents@0.28.0
+  - npm:@narumitw/pi-btw
+  - npm:pi-must-have-extension
+  - npm:pi-interactive-shell
+  - npm:pi-mcp-adapter
   - npm:pi-codex-goal@0.1.38
 ---
 
