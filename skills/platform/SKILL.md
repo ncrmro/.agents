@@ -1,6 +1,6 @@
 ---
 name: platform
-description: Platform-engineering standards for developer environments and microVMs, Nix-packaged npm applications and containers, and agent configuration. Use when creating or changing devenv configurations, dev-server startup (ports, hostnames, process supervision), microVM configuration, lifecycle, diagnostics, or cleanup, Nix flake or container outputs for npm packages, or the .agents / Outfitter configuration layers of a repository.
+description: Platform-engineering standards for devenv, microVMs, Nix packaging and user-profile overrides, npm containers, Stalwart on Keystone/NixOS, Kubernetes workload OIDC, and .agents/Outfitter configuration. Use when changing these platform surfaces, including GitHub or Forgejo Actions authentication to Kubernetes.
 ---
 
 # Platform
@@ -50,13 +50,55 @@ fixed host ports.
 
 Use `buildNpmPackage` with `importNpmLock` by default so the committed npm lockfile supplies dependency integrity and release automation does not need to maintain a separate Nix dependency hash. Read [`references/npm-nix.md`](references/npm-nix.md) before adding or changing an npm package flake output or building that package into a Nix container image.
 
+## Fast Nix user-profile overrides
+
+For fast-moving user CLI packages that need to update without rebuilding Home
+Manager or NixOS, keep the declarative package as the reproducible baseline and
+shadow it with an isolated `nix profile`. Read
+[`references/nix-user-profiles.md`](references/nix-user-profiles.md) before
+creating the profile or its update script. It covers PATH precedence, unlocked
+flake references, safe links, update/rollback behavior, shell command-cache
+refresh, verification, and eventual promotion back to the declarative layer.
+
 ## Release automation
 
 Version and release repositories with release-please: Conventional Commits on the default branch drive one release PR that bumps the version + CHANGELOG, and merging it tags a GitHub release that a **separate** workflow publishes (npm with provenance, a container, or a git tag). Read [`references/release-please.md`](references/release-please.md) before adding or changing a release-please config or a publish workflow — it covers the org PAT needed because `GITHUB_TOKEN` is blocked from opening PRs, the `node` vs `simple` release types (and pre-1.0 bump behavior), and publishing on `release: published`.
 
+## Cloudflare Workers site CI
+
+For multi-site Astro-on-Workers CI — mock version previews, Playwright smoke,
+gated production — read
+[`references/cloudflare-workers-site-ci.md`](references/cloudflare-workers-site-ci.md)
+before changing a site deploy/preview workflow or a Worker's auth config. It
+covers the one-reusable-`workflow_call` consolidation (PR + main run the same
+build→preview→smoke path via explicit input flags), the reusable-workflow
+`startup_failure` traps (permissions can't escalate; test only via merge), why
+Durable Objects block version-preview URLs (and the delete-class migration to
+remove one), the `--var` overrides a mock preview needs to not 500
+(`ARTERA_DATA_MODE:mock`, `AUTH_STORAGE_MODE:memory`, empty `AUTH_COOKIE_DOMAIN`,
+a throwaway `BETTER_AUTH_SECRET`), and the load-bearing rule that **smoke tests
+previews, not production** — provision production `wrangler secret`s separately
+(missing ones 500 every version, so rollback won't fix them) and curl the live
+origins after deploy.
+
+## Stalwart mail infrastructure
+
+For a Stalwart server managed through Keystone/NixOS, read [`references/stalwart-setup.md`](references/stalwart-setup.md) before enabling, upgrading, exposing, or diagnosing the service. It covers the Keystone service registry, NixOS module and host-override boundary, state-version and storage safety, TLS, listeners, secrets, deployment, and verification.
+
+Read [`references/stalwart-accounts.md`](references/stalwart-accounts.md) before creating, changing, rotating, validating, or deleting Stalwart domains and accounts. It separates Keystone's declarative agent provisioning from direct principal API operations and documents the role, login-name, secret-recipient, DAV, and password-rotation traps.
+
+## Kubernetes workload OIDC
+
+For Kubernetes deployments that use GitHub or Forgejo Actions OIDC instead of a
+stored kubeconfig, read
+[`references/kubernetes-actions-oidc.md`](references/kubernetes-actions-oidc.md)
+before changing API-server authentication, workflow token requests, or RBAC. It
+covers the host/cluster ownership split, K3s/NixOS configuration, verification,
+and recovery.
+
 ## Agent configuration (.agents and Outfitter)
 
-Repositories keep agent-facing configuration in the `.agents` directory standard (skills, agents, shared conventions, settings). Pi loads skills natively from `~/.agents/skills/` and project `.agents/skills/`; Outfitter treats `.agents/` as its authored configuration protocol, resolving workspace, global, and remote catalog layers before projecting them into harness-specific runtime config. Read [`references/agents.dotfiles.md`](references/agents.dotfiles.md) before changing `.agents`, Outfitter, or agent catalog configuration.
+Repositories keep agent-facing configuration in the `.agents` directory standard (skills, agents, shared conventions, settings). Pi loads skills natively from `~/.agents/skills/` and project `.agents/skills/`; Outfitter treats `.agents/` as its authored configuration protocol, resolving workspace, global, and remote catalog layers before projecting them into harness-specific runtime config. Read [`references/agents.dotfiles.md`](references/agents.dotfiles.md) before changing `.agents`, Outfitter, agent catalog configuration, or Pi extension loadouts/local overrides.
 
 For repositories where agents (or humans) should land PRs automatically once CI passes — the merge target for the `subagent-delegation` skill's `pr` land path — read [`references/automerge-merge-queues.md`](references/automerge-merge-queues.md): enabling `gh pr merge --auto`, the required branch-protection/ruleset gate, and when to add a merge queue.
 
