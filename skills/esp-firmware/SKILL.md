@@ -22,7 +22,12 @@ Supporting docs live next to this `SKILL.md`; read them only when needed:
 - `references/web-flasher.md` — browser flashing (esp-web-tools/Web Serial) and
   the per-device **auth-provisioning** pattern (flash a secret-free binary, then
   write a device-key frame over serial), including protected static assets,
-  clean site-build integration, native-USB re-enumeration, and NVS persistence.
+  clean site-build integration, native-USB re-enumeration, and NVS persistence —
+  plus **distribution/versioning/OTA**: firmware CI decoupled from site deploys,
+  object-storage publishing (immutable `<device>/<version>/` dirs + channel
+  manifest promotion, the ESPHome R2 pattern), one multi-chipFamily manifest per
+  fleet, CORS hosting rules, and managed OTA via `update: http_request`
+  (`ota` block, md5, redirect/512-byte gotcha, ota.bin vs factory.bin).
 - `scripts/list-usb-devices` — enumerate attached ESP32 boards (port, kind, MAC,
   chip). Run it when more than one board is plugged in so you flash the right port.
 
@@ -55,12 +60,50 @@ building — always run it first; it's seconds vs. minutes.
 ## Secrets: dotenv → ESPHome, never in git
 
 Wi-Fi creds and tokens live in a gitignored **`.env`** (devenv `dotenv.enable`
-loads it). A `fw-secrets` step generates ESPHome's `secrets.yaml` from those env
+loads it). In projects organized with executable packages under `code/`, the
+firmware-specific convention is:
+
+```text
+<project-root>/code/esp-firmware/.env
+```
+
+Keep it beside `code/esp-firmware/.env.example` and the firmware package's own
+devenv files. Do not put firmware credentials in `<project-root>/.env` or reuse
+an application/site dotenv: the firmware package owns its credential boundary.
+A `fw-secrets` step generates `code/esp-firmware/secrets.yaml` from those env
 vars, so the firmware reads them via `!secret`. Commit only `.env.example`;
 gitignore `.env` **and** the generated `secrets.yaml`. Never commit real
 credentials — flag it if asked to, and offer to land the convention (example +
 wiring) instead. Wi-Fi/PSK is compile-baked, so changing it needs a reflash (or
 provision in-browser via Improv — no recompile).
+
+### Worktrees: `.env` is checkout-local, not branch content
+
+A gitignored `.env` is filesystem state beside a checkout; it is never “in
+`main`” or any other Git branch. Every worktree has its own ignored files. When
+someone says the firmware dotenv is “in the main branch,” interpret that as the
+primary checkout currently holding `main`, resolve it with `git worktree list
+--porcelain`, and inspect
+`<main-checkout>/code/esp-firmware/.env`. Do not assume the main checkout path,
+and do not stop at the current worktree.
+
+Before declaring credentials absent:
+
+1. Resolve all worktrees and check the project-designated canonical checkout.
+2. If it is absent there, search sibling worktrees for the exact
+   `code/esp-firmware/.env` path and report any location mismatch; do not
+   silently redefine the canonical source.
+3. Verify the file is ignored with `git check-ignore -v`.
+4. Inspect only file presence, mode, expected key names, and value lengths.
+   Never print values, expanded ESPHome config, or a generated `secrets.yaml`.
+5. If credentials must be mirrored into the active worktree, copy them to its
+   ignored `.env` with mode `0600`, then run the device-specific `fw-secrets`
+   validation. A partial dotenv may be valid for one board but insufficient for
+   another, so validate required keys per device before flashing.
+
+Generated `secrets.yaml` files should also be mode `0600`. Prefer a
+project-designated external secret source or primary-checkout dotenv over
+letting divergent copies accumulate across worktrees.
 
 ## Quick diagnostics
 

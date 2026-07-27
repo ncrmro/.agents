@@ -247,3 +247,58 @@ without a reboot.
 10. If an older credential-bearing image was ever reachable, deploy containment,
     rotate every embedded credential, and re-provision affected boards. Treat
     code completion and incident closure as separate milestones.
+
+## Distribution, versioning, and OTA (the ESPHome-project pattern)
+
+How the ESPHome org itself ships esp-web-tools firmware (their reusable
+workflows in `esphome/workflows`), and the contract the manifest gives you.
+Copy this instead of inventing a scheme.
+
+**Decouple firmware builds from site deploys.** Never make a web app's build
+shell out to `esphome compile` — an esphome toolchain in every site build is
+slow, fragile, and couples unrelated release cadences. Give firmware its own
+CI workflow triggered only by firmware paths (plus `workflow_dispatch`), and
+publish the artifacts to object storage (ESPHome uses Cloudflare R2). The
+site serves the bytes from storage at stable URLs; its build never needs
+esphome.
+
+**One manifest, many devices — selection is by chip.** A single manifest's
+`builds[]` array carries one entry per `chipFamily`, and esp-web-tools picks
+the build matching the connected chip automatically. So a fleet of distinct
+boards (S3 camera node, C3 sensor node, classic-ESP32 node) can share one
+flat `/firmware/manifest.json`. You are forced into separate manifests only
+when two *different products* share a chip family.
+
+**Hosting rules.** The install page must be https (Web Serial requirement).
+The manifest and binaries may live on a different origin than the page if
+that origin returns `Access-Control-Allow-Origin` for the page's domain;
+relative `parts[].path` entries resolve relative to the manifest URL.
+
+**Versioning = immutable dirs + a mutable channel manifest.** Upload each
+release as an immutable `<device>/<version>/{manifest.json,*.bin}` tree.
+"Promote" by rewriting that version's manifest so every `parts[].path` (and
+`ota.path`) gets the `<version>/` prefix, then writing it one level up as
+the channel manifest — `manifest.json` for production, `manifest-beta.json`
+for beta. The channel manifest is a tiny pointer over immutable artifacts;
+rollback is re-promoting an older version. (This is exactly ESPHome's
+`promote-r2.yml` jq step.)
+
+**OTA from the same manifest.** ESPHome's `update: platform: http_request`
+component consumes the same manifest, extended with a mandatory per-build
+`ota` block: `{ "md5": "<hex>", "path": "..." }` (+ optional `release_url`,
+`summary`). Devices poll the manifest (default every 6 h), compare the
+manifest `version` to their own, then download, MD5-verify, and apply.
+Gotchas:
+
+- OTA uses the app-only `firmware.ota.bin`; browser flashing uses
+  `firmware.factory.bin` at offset 0. Publish both.
+- Serve from a **non-redirecting** origin — redirect targets (e.g. GitHub
+  release assets) can overflow the device's default 512-byte URL buffer.
+- Path resolution: absolute URLs as-is; `/`-rooted against the manifest's
+  host; bare paths relative to the manifest's directory.
+
+**Build-output path gotcha.** ESPHome writes build output under
+`.esphome/build/<name>/build/` where `<name>` is the yaml's `esphome: name:`
+field — *not* the yaml filename. Scripts that hardcode a directory derived
+from the filename break silently when the device name differs; derive the
+path from the `name:` field.
