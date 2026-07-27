@@ -4,13 +4,20 @@ Operational caveats for this skill's toolchain. The behavioral instructions live
 in `SKILL.md`; this file records environment gotchas worth knowing before you
 debug them the hard way.
 
+## GPU-first contract
+
+Call `scripts/transcribe-media.sh FILE`. It classifies a run as Vulkan, Metal, or
+CUDA only when the model-load log contains a configured runtime marker. It
+records a parsed device name when available and keeps the raw log. Prefer Vulkan
+on Linux/AMD and Metal on Apple; use CUDA when the runtime supports it. If the
+command falls back to CPU, it reports why. `--require-gpu` exits instead.
+
 ## GPU acceleration is asymmetric on AMD
 
 Measured on an AMD **Radeon RX 9070 XT (RADV GFX1201, RDNA4)**:
 
-- **`whisper-cli` (whisper.cpp) — GPU works.** The devenv ships
-  `whisper-cpp-vulkan`, which offloads to the GPU via the Vulkan backend
-  automatically (`use gpu = 1`, `using Vulkan0 backend`). This is the fast local
+- For `whisper-cli` (whisper.cpp), use the Vulkan build and verify
+  `using Vulkan0 backend` in every runtime log. This is the fast local
   transcription path on AMD.
 - **`whisperx` — CPU only on AMD.** whisperx's ASR engine is **CTranslate2
   (faster-whisper), which is CUDA-only** — it cannot target an AMD GPU. On top of
@@ -18,10 +25,10 @@ Measured on an AMD **Radeon RX 9070 XT (RADV GFX1201, RDNA4)**:
   false`), so its VAD/alignment/diarization torch models also run on CPU. This is
   an upstream limitation, not a misconfiguration.
 
-Consequence: for GPU-accelerated transcription on AMD, use `whisper-cli`
-(Vulkan). Reach for whisperx only when you need diarization, and accept that it
-runs on CPU here (fine for the diarization overlay; the expensive ASR should go
-through whisper.cpp-vulkan when speed matters).
+Use whisper.cpp for the primary GPU-backed transcript. When labels are required,
+the bundled workflow runs WhisperX as a separate second pass. On this AMD host,
+that pass repeats ASR, alignment, and diarization on CPU, so expect substantial
+additional runtime.
 
 A future GPU-diarization path exists — nixpkgs has `torchWithRocm`, and Ollama
 already GPU-runs on this card via ROCm — but overriding whisperx to use ROCm

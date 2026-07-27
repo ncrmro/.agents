@@ -19,12 +19,17 @@ let
     pkgs.zlib
     pkgs.stdenv.cc.cc.lib # libstdc++
   ];
+  whisperCpp =
+    if pkgs.stdenv.isDarwin
+    then pkgs.whisper-cpp
+    else pkgs.whisper-cpp-vulkan;
 in
 {
   packages = [
     pkgs.ffmpeg # audio/video → 16 kHz mono WAV; cutting/encoding
-    pkgs.whisper-cpp-vulkan # whisper-cli, GPU-accelerated via Vulkan (falls back to CPU)
+    whisperCpp # Metal on Apple, Vulkan on Linux; runtime verification still required
     pkgs.whisperx # multi-speaker diarization (faster-whisper + pyannote)
+    pkgs.shellcheck
     pkgs.uv # docling is installed as a uv tool (nixpkgs#docling is broken)
     pkgs.python3
     pkgs.curl # model downloads + Ollama endpoint probing
@@ -39,7 +44,6 @@ in
 
   enterShell = ''
     export PATH="$HOME/.local/bin:$PATH" # uv-installed docling lives here
-    command -v docling >/dev/null 2>&1 || uv tool install docling
 
     # Informational, non-fatal: surface any missing pieces on shell entry.
     bash "$DEVENV_ROOT/scripts/deps-doctor.sh" -q || true
@@ -59,4 +63,10 @@ in
   '';
 
   scripts.deps-doctor.exec = ''bash "$DEVENV_ROOT/scripts/deps-doctor.sh" "$@"'';
+  scripts.transcription-doctor.exec =
+    ''bash "$DEVENV_ROOT/scripts/toolchain-doctor.sh" "$@"'';
+  scripts.transcribe-media.exec =
+    ''bash "$DEVENV_ROOT/scripts/transcribe-media.sh" "$@"'';
+  scripts.transcription-test.exec =
+    ''bash "$DEVENV_ROOT/tests/transcription.test.sh" "$@"'';
 }

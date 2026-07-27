@@ -1,0 +1,4 @@
+interface:
+  display_name: "OBS Recording"
+  short_description: "Set up, operate, and verify OBS recordings"
+  default_prompt: "Use $obs-recording to inspect and safely operate my OBS setup, then validate or transcribe its recording output."

@@ -26,6 +26,7 @@ Outfitter v1 resolves resources from project `.agents/`, then global `~/.agents/
 | `skills/`                                   | Native v1 skills shared by those agents and consuming projects                       |
 | `settings.yml`                              | v1 defaults and published sources                                                    |
 | `settings.local.yml`                        | Ignored machine-local source overrides (see runbook)                                 |
+| `mcp.json`                                  | Shared MCP servers selected by agent loadouts                                        |
 | `profiles/`                                 | Frozen pre-v1 snapshot (see `AGENTS.md`)                                             |
 | `AGENTS.md`                                 | Agent orientation: precedence, source graph, layout                                  |
 | `CONTRIBUTING.md`                           | Scope rules and change standards for committed changes                               |
@@ -38,6 +39,8 @@ Outfitter v1 resolves resources from project `.agents/`, then global `~/.agents/
 **Use this repository globally** — link or clone it at `~/.agents`. Outfitter v1 resolves these agents automatically as the global layer; projects can add higher-precedence resources in `<project>/.agents/`.
 
 **Develop live** — put machine-specific source paths in ignored `settings.local.yml`, then run `outfitter validate`; the full validation and inspection commands are in the [runbook](docs/runbook/agent.dotfile-development.md#step-2-point-at-local-development-checkouts).
+
+**Enable Playwright MCP** — run `scripts/install-playwright-mcp.sh` once per machine. It installs `playwright-mcp` and Nix-managed Chromium browsers into the default Nix profile, writes a PATH wrapper at `~/.local/bin/mcp-server-playwright`, and verifies that the `mcp.json` command can start.
 
 ## Upstream sources
 

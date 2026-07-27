@@ -3,25 +3,40 @@ set -euo pipefail
 
 PROGRAM=${0##*/}
 INCLUDE_HIDDEN=1
+CALLER_DIR=$(pwd -P)
 
 die() { printf '%s: %s\n' "$PROGRAM" "$*" >&2; exit 2; }
 
-# This repository tool is intentionally confined to the wiki/ vault. Resolve the
-# repository from the script location so invoking it from another directory cannot
-# broaden the search to that directory, docs/, code/, or an arbitrary --vault path.
+# This tool is intentionally confined to one repository's wiki/ vault. A
+# project-local installation owns its repository directly. A shared/global
+# skill installation may live in a catalog repository with no wiki, so in that
+# case resolve the consuming repository from the caller's current directory.
+# Neither route accepts an arbitrary vault path.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-REPO_ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null) || die "cannot locate the repository containing this script"
+SCRIPT_REPO_ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)
+
+if [[ -n $SCRIPT_REPO_ROOT && -d $SCRIPT_REPO_ROOT/wiki ]]; then
+  REPO_ROOT=$SCRIPT_REPO_ROOT
+else
+  CALLER_REPO_ROOT=$(git -C "$CALLER_DIR" rev-parse --show-toplevel 2>/dev/null) ||
+    die "the skill repository has no wiki; run from inside the target Git repository"
+  [[ -d $CALLER_REPO_ROOT/wiki ]] ||
+    die "target repository wiki is not a directory: $CALLER_REPO_ROOT/wiki"
+  REPO_ROOT=$CALLER_REPO_ROOT
+fi
+
 VAULT=$REPO_ROOT/wiki
-[[ -d $VAULT ]] || die "repository wiki is not a directory: $VAULT"
 VAULT=$(cd -- "$VAULT" && pwd -P)
 
 usage() {
   cat <<'EOF'
 Usage: wiki-cli COMMAND [ARGUMENT]
 
-Audit and search this repository's Obsidian-style wiki using fd and ripgrep. The
-tool is confined to the repo's wiki/ tree and works from any directory. search
-covers source content.md / transcript.md alongside notes.
+Audit and search an Obsidian-style repository wiki using fd and ripgrep. The
+tool is confined to the selected repo's wiki/ tree. A project-local copy uses
+the repository containing this script; a shared skill copy uses the caller's
+current Git repository. search covers source content.md / transcript.md
+alongside notes.
 
 Commands:
   check                 Report missing and ambiguous internal links

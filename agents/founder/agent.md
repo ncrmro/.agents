@@ -5,8 +5,12 @@ subagents:
   - engineer
   - researcher
   - platform
+mcp:
+  - playwright
 extensions:
   - npm:@mjakl/pi-subagent
+  - npm:pi-mcp-adapter
+  - npm:pi-codex-goal@0.1.38
 ---
 
 # Founder

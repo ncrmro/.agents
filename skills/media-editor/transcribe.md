@@ -4,6 +4,22 @@ Read this document when the user asks to transcribe a video or audio file, wants
 subtitles, needs timestamped text to find cut points, or wants a **multi-speaker**
 conversation split by who is talking.
 
+## One command
+
+```bash
+scripts/transcribe-media.sh FILE
+scripts/transcribe-media.sh FILE --output-base PATH --model MODEL \
+  --audio-stream INDEX --diarize auto --require-gpu
+```
+
+By default, the command writes sibling `.txt`, `.srt`, `.json`, runtime-log, and
+`.transcription.json` files. It exits if any target already exists.
+`--diarize always` requires WhisperX and `HF_TOKEN`; `--diarize never` disables
+WhisperX. In auto mode, WhisperX runs only when the selected stream's metadata
+indicates multiple speakers and its prerequisites are available. Otherwise, the
+command explains why it skipped diarization and how to enable it. It does not
+infer speaker count.
+
 Two engines, picked by the job:
 
 - **whisper.cpp (`whisper-cli`)** — fast local single-track transcription with
@@ -17,16 +33,17 @@ If a tool is missing, run `scripts/deps-doctor.sh` (see `setup-tools.md`).
 
 ## Order of operations
 
-Try things in this order — stop as soon as the result is good enough:
-
-1. **Preflight** — `scripts/deps-doctor.sh`. For diarization, confirm `HF_TOKEN`
-   is set *and* the gated pyannote models are accepted (`README.md` → gated
-   models), or `--diarize` fails with a 403.
-2. **Transcribe with `whisper-cli` first** — it's GPU-accelerated on AMD via
-   Vulkan and is all you need for single-speaker audio, subtitles, and edit
-   planning. `ggml-large-v3` for accuracy, `base.en`/`small.en` for speed.
-3. **Escalate to `whisperx --diarize` only when you need speaker labels** (runs
-   on CPU here). Climb this ladder, stopping when attribution is right:
+1. **Preflight** — the shared command checks tools/model and extracts clean
+   16 kHz mono PCM with an explicit stream map.
+2. **Check, then transcribe with whisper.cpp** — a short runtime probe must emit
+   a configured Vulkan, Metal, or CUDA marker before the job is called
+   GPU-backed. Any other result is a reported CPU fallback; `--require-gpu`
+   stops before long work.
+3. **Run WhisperX after raw ASR only when diarization is selected.** Keep its raw
+   `.diarized.*` outputs separate. The Torch CUDA preflight chooses WhisperX's
+   requested device; the subsequent WhisperX run is the compatibility check. If
+   you know the speaker count, refine the result with a direct WhisperX call;
+   this interface does not infer it.
    1. `whisperx <audio> --model small --diarize --hf_token "$HF_TOKEN"`.
    2. Speakers collapsing into one `SPEAKER_00`? Add
       `--min_speakers N --max_speakers N` when the count is known — **essential**
@@ -66,8 +83,11 @@ Try things in this order — stop as soon as the result is good enough:
    full media duration (compare `ffprobe -show_format`), and spot-check a few
    segments against the audio.
 
-`whisper-cpp-vulkan` uses the GPU automatically when Vulkan drivers are present;
-otherwise it runs on CPU. No flags needed.
+A GPU-capable package can still fall back to CPU because of its build, driver,
+device visibility, or runtime initialization. The shared command classifies the
+backend from configured model-load markers and preserves the raw log. A parsed
+device name is recorded when available; otherwise the report uses a generic
+backend label.
 
 ## Multi-speaker diarization (whisperx)
 

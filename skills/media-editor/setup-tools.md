@@ -4,26 +4,29 @@ Read this document when `ffmpeg`, `ffprobe`, `whisper-cli`, or `whisperx` is
 missing, when the user asks to set up the media environment, or before starting
 a job on a fresh machine.
 
-## Fastest path: the dependency doctor
+## Transcription preflight and explicit remediation
 
-`scripts/deps-doctor.sh` checks everything below, detects the OS and package
-manager, and prints exact install commands. It never mutates the system unless
-you pass `--install`.
+`scripts/toolchain-doctor.sh` checks ffmpeg, jq, whisper.cpp, the model, and
+diarization prerequisites. It never changes the system unless you pass
+`--install`. Automatic installation supports Nix only; Homebrew and apt print
+suggested manual steps and exit without making changes.
 
 ```bash
-bash scripts/deps-doctor.sh            # report + copy-paste install commands
-bash scripts/deps-doctor.sh --install  # install missing pieces (nix / brew / apt / uv / ollama)
-bash scripts/deps-doctor.sh --json     # machine-readable, for preflight gating
+bash scripts/toolchain-doctor.sh            # report requirements
+bash scripts/toolchain-doctor.sh --install  # add missing commands to a Nix profile
+bash scripts/toolchain-doctor.sh --json     # machine-readable preflight
 ```
 
 Exit status is `0` when every required tool is present, `1` otherwise, so the
-doctor doubles as a preflight in scripts and CI.
+doctor doubles as a preflight in scripts and CI. Run `scripts/deps-doctor.sh`
+for the broader media toolchain, including optional Docling and Ollama checks.
 
 ## Reproducible path: devenv
 
 The skill ships a `devenv.nix` providing the full toolchain (GPU-accelerated
-`whisper-cpp-vulkan` + `whisperx` + ffmpeg + docling). Enter it, or run one
-command inside it:
+whisper.cpp on supported platforms + `whisperx` + ffmpeg). Enter it, or run one
+command inside it. A package being present is not GPU proof; the transcription
+command performs the runtime check.
 
 ```bash
 devenv shell                 # full toolchain on PATH
@@ -64,37 +67,30 @@ uv tool install whisperx docling   # or: pipx install whisperx
 
 Homebrew's `whisper-cpp` ships `whisper-cli`; on Apple Silicon it is Metal-built.
 
-## Nix (any OS)
+## Nix
 
-Preferred when a project has a devshell. Ad hoc or persistent:
+Preferred when a project has a devshell. Ad hoc (non-persistent) or explicit
+profile installation:
 
 ```bash
+# Linux
 nix shell nixpkgs#ffmpeg nixpkgs#whisper-cpp-vulkan nixpkgs#whisperx
-# or persistently:
 nix profile add nixpkgs#ffmpeg nixpkgs#whisper-cpp-vulkan nixpkgs#whisperx
+# macOS
+nix shell nixpkgs#ffmpeg nixpkgs#whisper-cpp nixpkgs#whisperx
+nix profile add nixpkgs#ffmpeg nixpkgs#whisper-cpp nixpkgs#whisperx
 ```
 
-- On NixOS/Linux with a GPU, `whisper-cpp-vulkan` uses the Vulkan backend
-  automatically (needs mesa/RADV drivers); it falls back to CPU otherwise.
+- On NixOS/Linux, `whisper-cpp-vulkan` provides the Vulkan-capable build. The
+  transcription command classifies the active backend from its runtime log.
 - `whisperx`'s torch runs on CPU on non-CUDA machines — fine, just slower.
 - `nixpkgs#docling` is currently broken; install it via `uv tool install docling`.
 
 ## Debian/Ubuntu (apt)
 
-ffmpeg is packaged; whisper.cpp is not — build from source:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y ffmpeg build-essential cmake git
-git clone https://github.com/ggml-org/whisper.cpp ~/.local/src/whisper.cpp
-cmake -S ~/.local/src/whisper.cpp -B ~/.local/src/whisper.cpp/build -DCMAKE_BUILD_TYPE=Release
-cmake --build ~/.local/src/whisper.cpp/build -j --config Release
-sudo cp ~/.local/src/whisper.cpp/build/bin/whisper-cli /usr/local/bin/
-uv tool install whisperx docling
-```
-
-(For NVIDIA GPUs add `-DGGML_CUDA=1` to the first cmake call — requires the CUDA
-toolkit. For AMD, use `-DGGML_VULKAN=1`.)
+The transcription installer does not support apt. It prints suggested manual
+steps and makes no changes. Any future source-build flow must select Vulkan or
+CUDA explicitly and verify the backend from its runtime log.
 
 ## Whisper model
 
@@ -117,8 +113,10 @@ user before pulling the large model.
 ## HF token (for whisperx diarization)
 
 pyannote's diarization weights are gated. Create a token at
-<https://hf.co/settings/tokens> and accept the terms at
-<https://hf.co/pyannote/speaker-diarization-3.1>.
+<https://hf.co/settings/tokens> and accept access to
+<https://hf.co/pyannote/speaker-diarization-community-1>, the bundled workflow's
+default. Direct runs using `speaker-diarization-3.1` also require access to that
+model and `pyannote/segmentation-3.0`.
 
 Store it in a **gitignored `.env`** in the skill root (`.env` and `.env.*` are
 ignored; `.env.example` is the template):
@@ -128,18 +126,17 @@ cp .env.example .env
 # then set HF_TOKEN=hf_... in .env
 ```
 
-Both the devenv (via `dotenv`) and `scripts/deps-doctor.sh` load `.env`
-automatically, so the token is available to `whisperx --diarize` without
-exporting it each session. `.env` can also override `OLLAMA_HOST`,
-`NEMOTRON_MODEL`, and `WHISPER_MODEL_DIR`. (A plain `export HF_TOKEN=…` still
-works too.)
+The devenv, `scripts/deps-doctor.sh`, and `scripts/transcribe-media.sh` load
+`.env`. It can also override `OLLAMA_HOST`, `NEMOTRON_MODEL`,
+`WHISPER_MODEL_DIR`, and `WHISPER_MODEL`. A plain `export HF_TOKEN=…` still
+works.
 
 ## Verify
 
-Quiet preflight — prints only problems:
+Run the transcription preflight:
 
 ```bash
-bash scripts/deps-doctor.sh -q
+bash scripts/toolchain-doctor.sh
 ```
 
 Optional end-to-end smoke test — 3 s of silence transcribed without errors:

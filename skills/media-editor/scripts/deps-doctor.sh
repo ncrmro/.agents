@@ -28,7 +28,13 @@ set -u
 # --------------------------------------------------------------------------
 _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 for _envf in "$_script_dir/../.env" "${DEVENV_ROOT:-/nonexistent}/.env"; do
-  if [ -f "$_envf" ]; then set -a; . "$_envf"; set +a; break; fi
+  if [ -f "$_envf" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "$_envf"
+    set +a
+    break
+  fi
 done
 
 # --------------------------------------------------------------------------
@@ -187,7 +193,9 @@ check_whisper_cli() {
 check_whisper_model() {
   local rem="mkdir -p '$WHISPER_MODEL_DIR' && curl -L -o '$WHISPER_MODEL_DIR/ggml-small.en-tdrz.bin' https://huggingface.co/akashmjn/tinydiarize-whisper.cpp/resolve/main/ggml-small.en-tdrz.bin"
   if ls "$WHISPER_MODEL_DIR"/ggml-*.bin >/dev/null 2>&1; then
-    local models; models="$(cd "$WHISPER_MODEL_DIR" && ls ggml-*.bin 2>/dev/null | tr '\n' ' ')"
+    local models
+    models="$(find "$WHISPER_MODEL_DIR" -maxdepth 1 -type f \
+      -name 'ggml-*.bin' -printf '%f\n' 2>/dev/null | sort | tr '\n' ' ')"
     record "whisper-model" ok 1 "$models" ""
   else
     record "whisper-model" missing 1 "no ggml-*.bin in $WHISPER_MODEL_DIR" "$rem"

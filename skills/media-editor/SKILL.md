@@ -22,8 +22,10 @@ Supporting documents live next to this `SKILL.md`; read them only when needed:
 - `ffprobe` for source inspection: duration, streams, chapters, codecs, resolution.
 - `ffmpeg` for all video work: extraction, cutting, speed changes, concatenation,
   encoding, and final export. Do not use other video tools unless the user asks.
-- `whisper.cpp` (`whisper-cli`) for fast local single-track speech-to-text;
-  `whisper-cpp-vulkan` is GPU-accelerated where Vulkan drivers exist.
+- `whisper.cpp` (`whisper-cli`) for local timestamped speech-to-text. Classify
+  GPU use only when configured runtime markers identify Vulkan, Metal, or CUDA;
+  keep the raw log. Prefer Vulkan on Linux/AMD, Metal on Apple, and CUDA where
+  the installed runtime supports it.
 - `whisperx` for **multi-speaker diarization** (real `SPEAKER_NN` labels + word
   timestamps) when a recording has more than one voice.
 - *(optional)* a local **Ollama** LLM (e.g. `nemotron-3-nano`) for transcript
@@ -31,18 +33,21 @@ Supporting documents live next to this `SKILL.md`; read them only when needed:
 
 ### Setup
 
-If a required tool is missing, run `scripts/deps-doctor.sh` (report) or
-`scripts/deps-doctor.sh --install` (fix), or enter the bundled `devenv shell`.
+Before transcription, run `scripts/toolchain-doctor.sh`. Installation is
+explicit: `--install` supports Nix only; Homebrew and apt print suggested steps
+without making changes. Use `scripts/deps-doctor.sh` for the broader media
+toolchain, including optional Docling and Ollama checks.
 See `setup-tools.md`. Ask before downloading large whisper models. Diarization
 needs an `HF_TOKEN` with the pyannote terms accepted.
 
 ## Standard pipeline
 
 1. **Inspect** — run `ffprobe` on the source recording before editing.
-2. **Transcribe** — follow `transcribe.md` and its "Order of operations":
-   whisper-cli first (GPU on AMD; single-speaker, subtitles, edit planning),
-   escalating to whisperx `--diarize` only when you need speaker labels — with
-   `--min_speakers/--max_speakers` when the count is known.
+2. **Transcribe** — call `scripts/transcribe-media.sh FILE`. It classifies the
+   whisper.cpp backend from runtime-log markers, reports CPU fallback reasons,
+   keeps raw outputs, and applies `--diarize auto|always|never`. Use
+   `--require-gpu` to refuse CPU for long work. Auto mode does not infer speaker
+   count.
 3. **Plan the edit** — read the transcript and identify content boundaries: dead
    air, filler, retakes, mistakes, key moments. Build a timestamped edit plan
    with segment ranges, actions, speeds, and estimated output length.
@@ -75,6 +80,9 @@ speed up body clips first; if under, slow down key moments before padding filler
 
 - Never overwrite source recordings. Write derived WAV/SRT/JSON/clips/finals
   alongside the input or under `output/` with the same basename.
+- Never claim GPU acceleration because `whisper-cli` exists. Record the
+  classified backend, parsed device label, raw runtime log, and CPU fallback
+  reason.
 - Run long `whisper-cli`, `whisperx`, and `ffmpeg` jobs in the background and
   check results when complete.
 - Prefer stream copy (`-c copy`) for lossless cuts when keyframe alignment is

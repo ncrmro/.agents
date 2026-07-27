@@ -1,0 +1,10 @@
+{
+  "name": "Exact OBS source name",
+  "role": "screen|camera|desktop-audio|microphone|overlay",
+  "required": true,
+  "visible": true,
+  "kinds": [
+    "exact-obs-input-kind"
+  ],
+  "notes": "Copy this object into a scene manifest and remove this field."
+}

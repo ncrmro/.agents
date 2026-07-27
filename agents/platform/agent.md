@@ -1,6 +1,8 @@
 ---
 name: platform
 description: Platform engineering agent for infrastructure, CI/CD, deployment, reliability, and developer tooling.
+mcp:
+  - playwright
 extensions:
   - git:github.com/ai-outfitter/deepwork
 ---

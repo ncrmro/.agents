@@ -199,7 +199,15 @@ Keep namespaces disjoint by role — e.g. equipment under `system/`, an input un
 
 ### `wiki-cli` (primary — always available)
 
-`./scripts/wiki-cli` is a ripgrep + fd tool that audits and searches the vault from any shell, needs no running app, and is confined to the repository's `wiki/` tree (so it runs the same from any directory without scanning `docs/`, `code/`, or the caller's working directory). Its `search` globs all Markdown inside that vault, so it covers source `content.md` / `transcript.md` alongside notes. **Prefer it** — it is the reliable path in agent and headless environments where the Obsidian CLI is unavailable.
+`./scripts/wiki-cli` is a ripgrep + fd tool that audits and searches the vault,
+needs no running app, and is confined to one repository's `wiki/` tree. A
+project-local copy uses the repository containing the script. When the skill is
+installed from a shared/global catalog whose repository has no `wiki/`, it uses
+the caller's current Git repository instead; run it from any directory inside
+the target repository. Its `search` globs all Markdown inside that vault, so it
+covers source `content.md` / `transcript.md` alongside notes. **Prefer it** — it
+is the reliable path in agent and headless environments where the Obsidian CLI
+is unavailable.
 
 Setup: none beyond `ripgrep` (`rg`) and `fd` on `PATH`; the script is committed executable. It intentionally does not accept an alternate vault path.
 
@@ -216,7 +224,12 @@ Setup: none beyond `ripgrep` (`rg`) and `fd` on `PATH`; the script is committed 
 ./scripts/wiki-cli --help
 ```
 
-Paths are relative to this skill directory. `tags` (taxonomy before tagging) and `backlinks` / `check` (link health before and after renaming) cover the checks the agent rules require. For anything `wiki-cli` does not expose, fall back to `rg` / `fd` directly over `wiki/`.
+Paths are relative to this skill directory. When using a shared skill copy,
+keep the shell inside the consuming repository so `wiki-cli` can select its
+`wiki/`. `tags` (taxonomy before tagging) and `backlinks` / `check` (link health
+before and after renaming) cover the checks the agent rules require. For
+anything `wiki-cli` does not expose, fall back to `rg` / `fd` directly over
+`wiki/`.
 
 ### `probe` (optional — fuzzy / ranked AI search)
 

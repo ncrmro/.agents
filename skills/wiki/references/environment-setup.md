@@ -3,10 +3,16 @@
 Nuances for getting the wiki search toolchain working. Read this when `probe` is
 missing from PATH, or when setting up the wiki tooling in a new checkout.
 
-The core search tool, `wiki-cli` (`scripts/wiki-cli`), needs only `ripgrep` (`rg`)
-and `fd` — both are usually already present, and it never requires a devenv. The
-`probe` CLI below is an **optional** AI/semantic search layer on top; install it
-when you want fuzzy "where is X discussed" search across notes and source text.
+The core search tool, `wiki-cli` (`scripts/wiki-cli`), needs only `ripgrep`
+(`rg`) and `fd`—both are usually already present, and it never requires a
+devenv. A project-local copy selects the repository containing the script. A
+shared/global skill copy whose catalog has no `wiki/` selects the caller's
+current Git repository, so invoke it from anywhere inside the target
+repository. It never accepts an arbitrary vault path.
+
+The `probe` CLI below is an **optional** AI/semantic search layer on top;
+install it when you want fuzzy "where is X discussed" search across notes and
+source text.
 
 ## Installing `probe`
 

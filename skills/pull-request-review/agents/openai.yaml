@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pull Request Review"
+  short_description: "Submit precise GitHub pull request reviews"
+  default_prompt: "Use $pull-request-review to inspect this pull request and submit one precise review with inline findings."

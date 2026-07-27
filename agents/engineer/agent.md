@@ -1,6 +1,8 @@
 ---
 name: engineer
 description: Engineering implementation agent for focused code, tests, reviews, and repository-maintained context.
+mcp:
+  - playwright
 extensions:
   - git:github.com/ai-outfitter/deepwork
 ---

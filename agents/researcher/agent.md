@@ -1,8 +1,12 @@
 ---
 name: researcher
 description: Evidence-backed research and durable knowledge maintenance agent.
+mcp:
+  - playwright
 extensions:
+  - git:github.com/ai-outfitter/chapters
   - git:github.com/ai-outfitter/deepwork
+  - npm:pi-codex-goal@0.1.38
 ---
 
 # Researcher
