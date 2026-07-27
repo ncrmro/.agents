@@ -14,10 +14,15 @@ delegation mechanism: delegate by sending, collect by reading the reply.
 
 ## Topology (Vega reference deployment)
 
-- Relay: `wss://vega.ncrmro.com/relay/v1/connect`, health at
-  `https://vega.ncrmro.com/relay/healthz` and `/readyz`. Hosted by the
-  `Agent/channels-relay` profile on the Ocean cluster.
-- Resident agent endpoint: `link:vega` (namespace `agent-vega`).
+- **The vega agent's pi process IS the relay server** — the relay runs as
+  the Channels Pi extension inside the one `Agent/vega` pod; there is no
+  separate relay pod. Clients connect DIRECTLY to the pod's TLS listener:
+  `wss://vega.ncrmro.com:30787/v1/connect`, health at
+  `https://vega.ncrmro.com:30787/healthz` and `/readyz` (NodePort 30787;
+  no ingress in the path).
+- Resident agent endpoint: `link:vega` (namespace `agent-vega`); its
+  conversation is a singleton — every peer and channel shares the
+  `link:vega` thread.
 - Operator principal: `vega-web`; its token lives in the cluster secret
   `-n vega secret/vega-agent-session` (keys `relayUrl`, `operatorToken`).
   Never print tokens; pull them straight into env.
