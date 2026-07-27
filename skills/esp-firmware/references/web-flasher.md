@@ -184,22 +184,25 @@ The provisioning endpoint should:
 
 ### Clean deployable builds
 
-- Make the site build invoke the browser-firmware builder before bundling static
-  assets. Ignored generated artifacts must never be an undeclared prerequisite
-  left over from a developer machine.
+- Build firmware in its **own CI workflow**, not inside the site build — see
+  "Distribution, versioning, and OTA" below for the decoupled pattern. The
+  rules here apply to whichever job builds the firmware. Either way, ignored
+  generated artifacts must never be an undeclared prerequisite left over from
+  a developer machine.
 - Pin the same ESPHome/esptool versions locally and in CI, install/cache the
-  toolchain in the deployment job, and build from a clean checkout with no
+  toolchain in the firmware job, and build from a clean checkout with no
   `secrets.yaml`.
 - As defense in depth, scan the output binary for each sufficiently long
   credential present in the local dotenv and fail before publishing on an exact
   match. Give the manifest a content-derived version.
-- Run the scan after copying the exact factory image into the site's public
-  directory, remove both binary and manifest on a match, and scan every relevant
-  local/CI token name. Never print the credential being searched. A minimum
-  length avoids noisy matches for empty or trivial values.
+- Run the scan on the exact artifact being published (whether copied into a
+  site's public dir or uploaded to object storage), remove both binary and
+  manifest on a match, and scan every relevant local/CI token name. Never
+  print the credential being searched. A minimum length avoids noisy matches
+  for empty or trivial values.
 - A clean checkout must succeed without generated `manifest.json`,
   `firmware.bin`, or `secrets.yaml`. Keep generated artifacts ignored, but make
-  the deploy build regenerate them deterministically.
+  the firmware CI job regenerate them deterministically.
 - If a credential-bearing image was ever public, take the asset offline first,
   rotate every compiled credential (including Wi-Fi/fallback credentials), and
   re-provision affected boards. A code-only fix does not end the incident.
@@ -262,12 +265,12 @@ publish the artifacts to object storage (ESPHome uses Cloudflare R2). The
 site serves the bytes from storage at stable URLs; its build never needs
 esphome.
 
-**One manifest, many devices — selection is by chip.** A single manifest's
-`builds[]` array carries one entry per `chipFamily`, and esp-web-tools picks
-the build matching the connected chip automatically. So a fleet of distinct
-boards (S3 camera node, C3 sensor node, classic-ESP32 node) can share one
-flat `/firmware/manifest.json`. You are forced into separate manifests only
-when two *different products* share a chip family.
+**One manifest, many devices — selection is by chip.** The manifest format
+(Part 1) allows multiple `builds[]` entries, one per `chipFamily`, and
+esp-web-tools picks the build matching the connected chip automatically. So a
+fleet of distinct boards (S3 camera node, C3 sensor node, classic-ESP32 node)
+can share one flat `/firmware/manifest.json`; separate manifests are forced
+only when two *different products* share a chip family.
 
 **Hosting rules.** The install page must be https (Web Serial requirement).
 The manifest and binaries may live on a different origin than the page if

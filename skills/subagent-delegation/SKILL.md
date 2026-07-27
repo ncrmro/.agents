@@ -19,8 +19,9 @@ while workers run, and lets many lanes run concurrently.
    it in by copy or cherry-pick rather than rebasing stale history; the goal is
    well-defined self-contained commits.
 2. **Implementation — codex, sol model, background shell task.** Launch
-   `codex exec -m gpt-5.6-sol --sandbox workspace-write -C <worktree> "<task>"`
-   as a background process with stdout captured to a log. Watch the log /
+   `codex exec -m "${CODEX_MODEL:-gpt-5.6-sol}" --sandbox workspace-write -C <worktree> "<task>"`
+   as a background process with stdout captured to a log (the model is a
+   default, overridable via `CODEX_MODEL`; delegate.sh honors the same var). Watch the log /
    completion signal; never block a foreground terminal on it. Include in the
    prompt: the branch's state, exact commit message(s) wanted, "do not push",
    and a final self-verification (status + log) to report.
@@ -36,10 +37,11 @@ while workers run, and lets many lanes run concurrently.
      PLAUSIBLE/advisory findings are reported to the coordinator, not churned on.
    - **Fix loop:** if code-review produced fixes, re-run it until it reports no
      new confirmed findings. Never land without both passes clean.
-4. **Land — squash-merged PR, per-lane, no pause once the gate is clean** (when
-   the run was authorized to land; otherwise stop and ask):
+4. **Land — squash-merged PR, per-lane, no pause once the gate is clean**
+   (authorization rules live in Safety below):
    `git push -u origin <branch> && gh pr create --fill && gh pr merge --squash`
-   (add `--auto` where branch protection gates on CI). If GitHub reports
+   (add `--auto` where branch protection gates on CI — setup procedure in the
+   `platform` skill's `references/automerge-merge-queues.md`). If GitHub reports
    CONFLICTING, the base moved: hand the worker a rebase/merge-resolution task
    (background codex again), re-verify, force-push `--force-with-lease`, merge.
 5. **Bookkeeping:** promote the lane's glyph in the plan file (`○ → ◉ → ●` + the
