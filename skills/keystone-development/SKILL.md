@@ -26,6 +26,9 @@ Read only the references required for the task:
   [references/runbook.baremetal-install.md](references/runbook.baremetal-install.md)
 - Any VM, microVM, direct image, ISO, Secure Boot, or TPM test:
   [references/virtual-machines.md](references/virtual-machines.md)
+- Watching or driving a headless VM — screenshots (screendump/grim), serial
+  console LUKS unlock, QEMU monitor sendkey, expect scripting, swtpm gotchas:
+  [references/vm-observation.md](references/vm-observation.md)
 - Boot, unlock, SSH, sudo, USB, or networking failures:
   [references/diagnostics.md](references/diagnostics.md)
 
