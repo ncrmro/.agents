@@ -24,8 +24,11 @@ Read only the references required for the task:
 - End-to-end physical installation, Secure Boot, LUKS enrollment, Stow
   activation, and reboot proof:
   [references/runbook.baremetal-install.md](references/runbook.baremetal-install.md)
-- Any VM, microVM, direct image, ISO, Secure Boot, or TPM test:
-  [references/virtual-machines.md](references/virtual-machines.md)
+- Booting, deploying, or smoke-testing fleet hosts as VMs, baremetal, or a
+  mix — the current harness (realizations, fleetMeta, remote vm hosts,
+  disko install tier): [references/ks-fleet.md](references/ks-fleet.md)
+- Any VM, microVM, direct image, ISO, Secure Boot, or TPM test (legacy
+  tiers): [references/virtual-machines.md](references/virtual-machines.md)
 - Watching or driving a headless VM — screenshots (screendump/grim), serial
   console LUKS unlock, QEMU monitor sendkey, expect scripting, swtpm gotchas:
   [references/vm-observation.md](references/vm-observation.md)
@@ -68,8 +71,8 @@ wiring, and per-user overrides.
 | --- | --- |
 | Pure evaluation, formatting, or a host closure | `ks-dev --build <host>` or `nix build` |
 | TPM/LUKS logic without UEFI | TPM microVM (Tier 1) |
-| Terminal or desktop configuration without real disk/security | `build-vm` (Tier 2) |
-| Storage, initrd, or boot chain below the installer | direct qcow2 image |
+| Terminal or desktop configuration without real disk/security | ks-fleet vm realization (`--as vm`) |
+| Storage, initrd, LUKS/TPM unlock below the installer | ks-fleet install realization (disko image + swtpm) |
 | Installer TUI, disko handoff, or manual Secure Boot/TPM proof | full ISO + libvirt VM plus explicit guest checks (Tier 3) |
 | Firmware, physical TPM/YubiKey, suspend, hibernate, dock, or USB behavior | real hardware |
 
