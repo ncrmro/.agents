@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Forge"
+  short_description: "Manage GitHub and Forgejo repository projects"
+  default_prompt: "Use $git-forge to update this repository issue or project safely."
