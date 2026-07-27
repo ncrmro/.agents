@@ -47,6 +47,12 @@ while workers run, and lets many lanes run concurrently.
    loop until the whole queue is merged. Finish a multi-lane queue by verifying
    the deployment of `main` actually works.
 
+**Stdin trap:** a backgrounded `codex exec` with no stdin redirect hangs
+forever "Reading additional input from stdin..." — it appends piped stdin to
+the prompt. Always launch background workers with `</dev/null` (delegate.sh
+does this). A worker whose worktree stays clean for a long time with no log
+output is almost certainly stdin-hung: kill it and relaunch, don't wait.
+
 ## Watching and resuming workers
 
 Background workers are shell processes — the orchestrator watches the log file

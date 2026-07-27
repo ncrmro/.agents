@@ -69,7 +69,8 @@ fi
 run_agent() {
   local prompt="$1"
   case "$agent" in
-    codex)     codex exec -m "$codex_model" --sandbox workspace-write -C "$PWD" "${codex_auto[@]}" "$prompt" ;;
+    # </dev/null: piped/empty stdin otherwise makes codex block reading it forever
+    codex)     codex exec -m "$codex_model" --sandbox workspace-write -C "$PWD" "${codex_auto[@]}" "$prompt" </dev/null ;;
     claude)    claude -p "$prompt" "${claude_auto[@]}" ;;
     outfitter) outfitter run --agent claude -- -p "$prompt" "${claude_auto[@]}" ;;
     *) die "unknown agent: $agent" ;;
