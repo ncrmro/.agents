@@ -16,3 +16,6 @@ SCRATCH.md
 # devenv runtime state
 /.devenv/
 /.direnv/
+
+__pycache__/
+*.py[cod]
