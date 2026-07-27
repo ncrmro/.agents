@@ -58,11 +58,19 @@ stable preview URL without touching production traffic. But a preview that
 production" is injected as a per-version `--var`. Inject explicitly:
 
 ```
+--var ARTERA_PREVIEW:true              # marks the version as a throwaway preview
 --var ARTERA_DATA_MODE:mock            # mock data, not the real DB
 --var AUTH_STORAGE_MODE:memory         # in-memory auth, no Turso/D1 needed
 --var "AUTH_COOKIE_DOMAIN:"            # host-only cookie (each alias is its own host)
---var BETTER_AUTH_SECRET:<throwaway>   # apps that require a secret in prod
 ```
+
+**NEVER inject a production *secret's* name as a preview `--var`** (e.g.
+`--var BETTER_AUTH_SECRET:<throwaway>`). Defining a plain-text var with the
+same name as an existing Worker secret converts the binding, and the next
+production `wrangler deploy` (which syncs bindings from config) silently drops
+the secret — a production outage that recurs on every CI cycle, and rollback
+can't fix it. Instead have the shared config allow a dev-fallback secret only
+when the preview flag is set, keeping production fail-closed.
 
 Symptoms when one is missing: `ConfigError: Missing required config X in
 production`, or `Persistent authentication requires TURSO_DATABASE_URL; cannot
