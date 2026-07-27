@@ -84,8 +84,10 @@ install and reboot phases keeps device names stable across snapshots.
   fresh VMs: order greetd `after = [ "home-manager-<user>.service" ]` so
   the stowed config exists before the first session.
 - **9p `sharedDirectories` create root-owned parent dirs** (e.g. ~/repos),
-  breaking user activation steps; fix with tmpfiles `z` rules handing the
-  tree back to the user.
+  breaking user activation steps. tmpfiles `z` rules DO NOT work here —
+  systemd-tmpfiles refuses "unsafe path transition" from a user-owned home
+  into a root-owned child. Use a root oneshot instead: `chown` the parents,
+  `after = [ "local-fs.target" ]`, `before = [ "home-manager-<user>.service" ]`.
 - **`pkill -x Hyprland` misses the uwsm/NixOS-wrapped process name** and
   reports nothing — restart the session via its unit instead:
   `systemctl --user restart wayland-wm@Hyprland.service` (uwsm), and
@@ -96,3 +98,14 @@ install and reboot phases keeps device names stable across snapshots.
 - vmVariant replaces fileSystems but **not swapDevices/resumeDevice** — a
   physical LVM swap volume hangs boot at "start job running for
   /dev/pool/swap (no limit)"; mkForce them empty in the vmVariant.
+- **`-vnc :N` baked into qemu options is incompatible with
+  `-display gtk,gl=on`** — for a headed run of a VNC-configured VM, use
+  plain `-display gtk` (no GL) or drop the vnc option from the variant.
+- **disko image builds with LUKS `passwordFile`** fail inside the image
+  builder VM (no one provides the key): give the disk a guarded
+  `preCreateHook = "[ -f /tmp/secret.key ] || echo -n secretsecret > /tmp/secret.key"`.
+  disko's LUKS type also has `enrollFido2` (enrolls a FIDO2 token at
+  format time) and testMode auto-passwords for `askPassword` configs.
+- **Pre-seed remote VM hosts** with `nix copy --substitute-on-destination
+  --to ssh://user@host` — the target pulls what it can from its own
+  substituters; `trusted-users = @wheel` makes it sudo-less.

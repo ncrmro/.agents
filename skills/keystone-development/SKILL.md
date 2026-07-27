@@ -29,6 +29,9 @@ Read only the references required for the task:
 - Watching or driving a headless VM — screenshots (screendump/grim), serial
   console LUKS unlock, QEMU monitor sendkey, expect scripting, swtpm gotchas:
   [references/vm-observation.md](references/vm-observation.md)
+- Migrating config from Home Manager generation to stow — attr-key traps,
+  stable profile slots vs store paths, switchover races, remote sudo:
+  [references/stow-home-manager.md](references/stow-home-manager.md)
 - Boot, unlock, SSH, sudo, USB, or networking failures:
   [references/diagnostics.md](references/diagnostics.md)
 
