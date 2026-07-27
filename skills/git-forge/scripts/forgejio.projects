@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+program="${0##*/}"
+login=""
+repo=""
+dry_run=false
+
+usage() {
+  cat <<EOF
+Usage:
+  ${program} [--login NAME] [--repo OWNER/REPO] [--dry-run] COMMAND [ARGS]
+
+Commands:
+  status                  Show project-unit and project-API support as JSON
+  enabled                 Print true when the repository project unit is enabled
+  enable                  Enable the repository project unit
+  disable --confirm REPO  Disable the project unit after exact confirmation
+  url [PROJECT_ID]        Print the repository projects URL
+  api-paths               Print project-related paths from the live OpenAPI schema
+  require-api TASK        Verify the server exposes project-board API endpoints
+  help                    Show this help
+
+Expected project-board tasks once Forgejo exposes them through its API:
+  list, view, create, edit, delete, add-board, move-board, add-issue, move-issue
+
+The installed Forgejo 15.0.2 schema has no project-board API endpoints. This
+wrapper never invents private web routes. Use 'require-api TASK' before planning
+an API-backed board mutation.
+EOF
+}
+
+fail() {
+  printf '%s: %s\n' "${program}" "$*" >&2
+  exit 2
+}
+
+unsupported() {
+  printf '%s: %s\n' "${program}" "$*" >&2
+  exit 69
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+}
+
+while (($#)); do
+  case "$1" in
+    --login)
+      (($# >= 2)) || fail "--login requires a value"
+      login="$2"
+      shift 2
+      ;;
+    --repo)
+      (($# >= 2)) || fail "--repo requires OWNER/REPO"
+      repo="$2"
+      shift 2
+      ;;
+    --dry-run)
+      dry_run=true
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      fail "unknown option: $1"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+command_name="${1:-help}"
+if (($#)); then
+  shift
+fi
+
+require_command tea
+require_command jq
+
+tea_login_args=()
+if [[ -n "${login}" ]]; then
+  tea_login_args=(--login "${login}")
+fi
+
+login_json="$(tea login list --output json)"
+if [[ -n "${login}" ]]; then
+  base_url="$(
+    jq -er --arg login "${login}" \
+      '.[] | select(.name == $login) | .url' <<<"${login_json}"
+  )" || fail "unknown tea login: ${login}"
+else
+  base_url="$(jq -er '.[] | select(.default == "true" or .default == true) | .url' <<<"${login_json}")" ||
+    fail "tea has no default login; pass --login NAME"
+fi
+base_url="${base_url%/}"
+
+require_repo() {
+  [[ "${repo}" =~ ^[^/]+/[^/]+$ ]] || fail "--repo OWNER/REPO is required"
+}
+
+repo_endpoint() {
+  require_repo
+  printf '/repos/%s\n' "${repo}"
+}
+
+fetch_schema() {
+  local output_file="$1"
+  tea api "${tea_login_args[@]}" "${base_url}/swagger.v1.json" --output "${output_file}"
+}
+
+project_paths() {
+  local schema_file
+  schema_file="$(mktemp)"
+  trap 'rm -f "${schema_file:-}"' RETURN
+  fetch_schema "${schema_file}"
+  jq -c '
+    [.paths
+      | to_entries[]
+      | select(
+          (.key | test("project"; "i")) or
+          (.value | tostring | test("project"; "i"))
+        )
+      | .key]
+    | unique
+  ' "${schema_file}"
+}
+
+repo_json() {
+  tea api "${tea_login_args[@]}" --repo "${repo}" "$(repo_endpoint)"
+}
+
+set_project_unit() {
+  local enabled="$1"
+  require_repo
+  if "${dry_run}"; then
+    jq -n \
+      --arg endpoint "$(repo_endpoint)" \
+      --argjson has_projects "${enabled}" \
+      '{method:"PATCH", endpoint:$endpoint, body:{has_projects:$has_projects}}'
+    return
+  fi
+  tea api "${tea_login_args[@]}" \
+    --repo "${repo}" \
+    --method PATCH \
+    --Field "has_projects=${enabled}" \
+    "$(repo_endpoint)" |
+    jq '{full_name, has_projects, html_url}'
+}
+
+case "${command_name}" in
+  help)
+    usage
+    ;;
+  status)
+    require_repo
+    version="$(tea api "${tea_login_args[@]}" /version | jq -er '.version')"
+    repository="$(repo_json)"
+    paths="$(project_paths)"
+    jq -n \
+      --arg version "${version}" \
+      --arg repo "${repo}" \
+      --arg base_url "${base_url}" \
+      --argjson enabled "$(jq '.has_projects' <<<"${repository}")" \
+      --argjson api_paths "${paths}" \
+      '{
+        forgejo_version:$version,
+        repository:$repo,
+        projects_url:($base_url + "/" + $repo + "/projects"),
+        project_unit_enabled:$enabled,
+        project_api_paths:$api_paths,
+        project_api_supported:($api_paths | length > 0)
+      }'
+    ;;
+  enabled)
+    require_repo
+    repo_json | jq -er '.has_projects'
+    ;;
+  enable)
+    (($# == 0)) || fail "enable takes no arguments"
+    set_project_unit true
+    ;;
+  disable)
+    require_repo
+    [[ "${1:-}" == "--confirm" && "${2:-}" == "${repo}" && $# == 2 ]] ||
+      fail "disable requires --confirm ${repo}"
+    set_project_unit false
+    ;;
+  url)
+    require_repo
+    (($# <= 1)) || fail "url accepts at most one PROJECT_ID"
+    if (($# == 1)); then
+      [[ "$1" =~ ^[0-9]+$ ]] || fail "PROJECT_ID must be numeric"
+      printf '%s/%s/projects/%s\n' "${base_url}" "${repo}" "$1"
+    else
+      printf '%s/%s/projects\n' "${base_url}" "${repo}"
+    fi
+    ;;
+  api-paths)
+    (($# == 0)) || fail "api-paths takes no arguments"
+    project_paths | jq -r '.[]'
+    ;;
+  require-api)
+    (($# == 1)) || fail "require-api requires a task name"
+    paths="$(project_paths)"
+    if [[ "$(jq 'length' <<<"${paths}")" == "0" ]]; then
+      unsupported "Forgejo exposes no project-board API for task '$1'; use $(printf '%q' "${program}") url to continue in the web UI"
+    fi
+    printf '%s\n' "${paths}" | jq .
+    ;;
+  list|view|create|edit|delete|add-board|move-board|add-issue|move-issue)
+    unsupported "project-board task '${command_name}' is unavailable because the live Forgejo schema exposes no project endpoints"
+    ;;
+  *)
+    fail "unknown command: ${command_name}; run '${program} help'"
+    ;;
+esac

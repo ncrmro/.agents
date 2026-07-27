@@ -101,6 +101,11 @@ For Forgejo project boards:
 Forgejo project APIs vary with server version. Discover the live schema instead
 of embedding an unverified endpoint in automation.
 
+Use `scripts/forgejio.projects` to inspect project support, enable or disable a
+repository's project unit, print project URLs, and reject unsupported board
+mutations safely. Run its `status` or `require-api` command before planning
+project-board automation.
+
 ## Bodies and structured payloads
 
 Draft substantial issue, pull request, comment, and API payloads in a temporary
