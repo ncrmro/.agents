@@ -145,6 +145,38 @@ references carry only the notation.
 If a plan has several homes, the on-disk plan file is canonical; reports and
 issue bodies are snapshots of it.
 
+### Handoff files: `TASKS.md`, `PLAN.md`, `CHANGELOG.md`
+
+A durable working context is a triad of plain-markdown files kept current so
+any agent (or human) can resume cold. Each answers a different question:
+
+- **`PLAN.md`** — *what we intend and in what order.* The projected git graph
+  (or a short pointer to the canonical committed report plus the repo map).
+  Update when scope, milestones, or where-work-lives changes.
+- **`TASKS.md`** — *what is happening right now.* Live and blocked work,
+  newest first: the in-flight task's exact state, the next concrete step, and
+  gotchas already hit. Update when a task starts, changes state, or completes.
+- **`CHANGELOG.md`** — *what already landed.* Append-only log with commit
+  hashes, plus non-code runtime state where it matters (e.g. what a physical
+  host is currently running). Never rewrite its history.
+
+PLAN is the future, TASKS is the present, CHANGELOG is the past — the same
+time axis the graph uses, split across three files a human scans instantly.
+
+This triad lives at **two levels**, and both can be true at once:
+
+- **Repo level** — inside one repository, version-controlled, scoped to that
+  repo's work. `PLAN.md` sits where the repo's AGENTS.md points.
+- **Org level** — in a workspace directory holding several repo checkouts
+  (often not itself a git repo), as shared cross-repo scratch state. The
+  org-level `PLAN.md` points at the lead repo's canonical report and maps
+  which work lives in which repo; org `CHANGELOG.md` logs per-repo with
+  hashes; org `TASKS.md` carries whatever is in flight across repos.
+
+Record the convention in the owning `AGENTS.md` (which files exist, at which
+level) and update the relevant file in the same turn as the work it
+describes — before ending a session or handing off.
+
 ## Projects that span repos
 
 A project may span several repos in an org. Release lines are repo-scoped, so

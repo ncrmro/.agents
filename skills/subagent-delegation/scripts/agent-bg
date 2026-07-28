@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Run any agent command in the background with stdin detached and pid/log/exit
+# files that are easy for an orchestrator to monitor.
+#
+#   agent-bg <name> <command> [args...]
+#
+# Files are written under ${AGENT_BG_DIR:-/tmp/agent-bg}. The <name> is used as
+# an operator-facing handle; slashes are converted to dashes for file names.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: agent-bg <name> <command> [args...]
+
+Examples:
+  agent-bg fix-persist-sessions codex exec -m "${CODEX_MODEL:-gpt-5.6-sol}" \
+    --sandbox workspace-write -C ../repo.worktrees/fix/persist-sessions "$(cat task.md)"
+
+  agent-bg review-pass bash -lc 'claude -p "/code-review" --permission-mode acceptEdits'
+USAGE
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+name="${1:-}"
+[ -n "$name" ] || { usage; exit 2; }
+shift
+[ "$#" -gt 0 ] || { usage; exit 2; }
+
+safe_name="${name//\//-}"
+dir="${AGENT_BG_DIR:-/tmp/agent-bg}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mkdir -p "$dir"
+
+log="$dir/$safe_name.log"
+pidfile="$dir/$safe_name.pid"
+exitfile="$dir/$safe_name.exit"
+cmdfile="$dir/$safe_name.cmd"
+startedfile="$dir/$safe_name.started"
+
+# A new run owns this handle; stale completion from a previous run must not be
+# mistaken for the current worker.
+rm -f "$exitfile"
+printf '%s\n' "$(date -Is)" >"$startedfile"
+printf '%q ' "$@" >"$cmdfile"
+printf '\n' >>"$cmdfile"
+
+(
+  set +e
+  "$@" </dev/null >"$log" 2>&1
+  status=$?
+  printf '%s\n' "$status" >"$exitfile"
+  exit "$status"
+) &
+
+pid=$!
+printf '%s\n' "$pid" >"$pidfile"
+
+cat <<EOF
+agent-bg: $name
+pid:  $pidfile ($pid)
+log:  $log
+exit: $exitfile
+cmd:  $cmdfile
+
+monitor:
+  tail -f '$log'
+  ps -p "\$(cat '$pidfile')" -o pid,stat,etime,cmd
+  '$script_dir/agent-bg-status' '$name'
+EOF

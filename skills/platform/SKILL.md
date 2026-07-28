@@ -1,6 +1,6 @@
 ---
 name: platform
-description: Platform-engineering standards for devenv, microVMs, Nix packaging and user-profile overrides, npm containers, Stalwart on Keystone/NixOS, Kubernetes workload OIDC, and .agents/Outfitter configuration. Use when changing these platform surfaces, including GitHub or Forgejo Actions authentication to Kubernetes.
+description: Platform-engineering standards for devenv, microVMs, Nix packaging and user-profile overrides, npm containers, NixOS udev rules and unprivileged USB device access, Stalwart on Keystone/NixOS, Kubernetes workload OIDC, and .agents/Outfitter configuration. Use when changing these platform surfaces, including GitHub or Forgejo Actions authentication to Kubernetes.
 ---
 
 # Platform
@@ -59,6 +59,52 @@ shadow it with an isolated `nix profile`. Read
 creating the profile or its update script. It covers PATH precedence, unlocked
 flake references, safe links, update/rollback behavior, shell command-cache
 refresh, verification, and eventual promotion back to the declarative layer.
+
+## NixOS udev rules and device access
+
+`services.udev.extraRules` writes everything into **`99-local.rules`**, which is
+fine for rules whose effect is order-independent (`MODE`, `GROUP`, `SYMLINK`) and
+**silently wrong** for any rule whose tag another rule file has to consume. The
+common casualty is `TAG+="uaccess"`: systemd's `73-seat-late.rules` is what turns
+that tag into an ACL, so a tag set at 99 is applied too late and does nothing.
+The rule loads, `udevadm` shows it live, the device stays inaccessible, and
+nothing anywhere reports an error.
+
+Whenever ordering matters, ship the rules as a package so the filename — and
+therefore the priority — is yours:
+
+```nix
+services.udev.packages = [
+  (pkgs.writeTextFile {
+    name = "<thing>-udev-rules";
+    destination = "/etc/udev/rules.d/70-<thing>.rules";
+    text = ''
+      SUBSYSTEM=="usb", ATTR{idVendor}=="xxxx", ATTR{idProduct}=="yyyy", TAG+="uaccess", GROUP="<grp>", MODE="0660"
+    '';
+  })
+];
+```
+
+For granting a human unprivileged access to a USB peripheral:
+
+- Prefer `TAG+="uaccess"` over widening a group. It grants an ACL to whoever
+  holds the **active seat session**, so access follows the login and lapses with
+  it. Because the ACL is granted to the *user*, that user's non-seat shells (ssh,
+  multiplexers, agent harnesses) are covered too — as long as someone holds the
+  seat.
+- Pair it with `GROUP`/`MODE` as a fallback for headless or non-seat logins,
+  where no session owns the seat and `uaccess` therefore grants nothing. Add the
+  user to that group or the fallback is inert.
+- **Rules only fire on device events.** After a switch, replug the device;
+  a node created before the ruleset loaded is never re-evaluated. Diagnose by
+  comparing `stat -c %y` on the sysfs device against `/run/current-system`
+  rather than re-reading the rule.
+- **Verify on the node, not in `/etc`.** A rule being present proves nothing:
+  check `getfacl /dev/... | grep '^user:'` and the node's mode.
+
+The `label-maker` skill has a fully worked example of this, including a
+`ptouch-doctor` script that walks the whole chain and names the first broken
+link.
 
 ## Release automation
 

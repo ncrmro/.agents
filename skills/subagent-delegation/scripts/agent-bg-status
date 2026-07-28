@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Show process, exit, command, and log-tail state for an agent-bg run.
+#
+#   agent-bg-status <name> [--follow]
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: agent-bg-status <name> [--follow]
+
+Reads files from ${AGENT_BG_DIR:-/tmp/agent-bg}. Use --follow to tail -f the log
+after printing the snapshot.
+USAGE
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+name="${1:-}"
+[ -n "$name" ] || { usage; exit 2; }
+shift || true
+follow=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --follow|-f) follow=1; shift ;;
+    *) usage; exit 2 ;;
+  esac
+done
+
+safe_name="${name//\//-}"
+dir="${AGENT_BG_DIR:-/tmp/agent-bg}"
+log="$dir/$safe_name.log"
+pidfile="$dir/$safe_name.pid"
+exitfile="$dir/$safe_name.exit"
+cmdfile="$dir/$safe_name.cmd"
+startedfile="$dir/$safe_name.started"
+
+echo "agent-bg: $name"
+[ -f "$startedfile" ] && printf 'started: %s\n' "$(cat "$startedfile")"
+
+printf '\n== process ==\n'
+if [ -f "$pidfile" ]; then
+  pid="$(cat "$pidfile")"
+  if ps -p "$pid" -o pid,stat,etime,cmd; then
+    :
+  else
+    echo "not running (pid $pid)"
+  fi
+else
+  echo "no pid file: $pidfile"
+fi
+
+printf '\n== exit ==\n'
+if [ -f "$exitfile" ]; then
+  cat "$exitfile"
+else
+  echo "still running or no exit file"
+fi
+
+printf '\n== command ==\n'
+if [ -f "$cmdfile" ]; then
+  cat "$cmdfile"
+else
+  echo "no command file: $cmdfile"
+fi
+
+printf '\n== log tail ==\n'
+if [ -f "$log" ]; then
+  tail -80 "$log"
+else
+  echo "no log file: $log"
+fi
+
+if [ "$follow" = 1 ]; then
+  printf '\n== following %s ==\n' "$log"
+  tail -f "$log"
+fi

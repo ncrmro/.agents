@@ -88,9 +88,28 @@ lanes to need a conflict pass — that is normal, delegate it (step 4).
 - Verification is real or it didn't happen: never substitute a mocked success,
   and report gate findings (including skipped advisories) up to the user.
 
-## The helper script
+## Helper scripts
 
-[`scripts/delegate.sh`](scripts/delegate.sh) runs one lane end-to-end
+[`scripts/agent-bg`](scripts/agent-bg) runs any agent command in the
+background and leaves simple shell state for monitoring. It does not create a
+worktree, run gates, commit, push, or land; it only detaches stdin, captures
+stdout/stderr, writes pid/exit/command files under
+`${AGENT_BG_DIR:-/tmp/agent-bg}`, and prints monitor commands. Use it for ad hoc
+implementation-only dispatch, review passes, or any backend that is already in
+the right working directory:
+
+```sh
+scripts/agent-bg <name> <command> [args...]
+scripts/agent-bg-status <name> [--follow]
+
+# Example: implementation-only Codex worker in an existing worktree.
+scripts/agent-bg fix-persist-sessions \
+  codex exec -m "${CODEX_MODEL:-gpt-5.6-sol}" \
+    --sandbox workspace-write -C ../repo.worktrees/fix/persist-sessions \
+    "$(cat task.md)"
+```
+
+[`scripts/delegate.sh`](scripts/delegate.sh) remains the full lane workflow
 (worktree → codex worker → /simplify → /code-review loop → land). The
 orchestrator launches the whole script as a background shell task and watches
 its log:

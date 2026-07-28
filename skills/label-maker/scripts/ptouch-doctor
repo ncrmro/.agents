@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Diagnose why a Brother P-touch label maker can't be driven unprivileged.
+#
+# Walks the whole chain in order — enumerated? node permissions? ACL? rule
+# present? rule ordered correctly? node newer than the ruleset? can libusb
+# actually open it? — and names the specific fix for the first thing that is
+# wrong, rather than leaving you to guess which layer failed.
+#
+# Read-only: opens nothing, prints nothing to tape, needs no privileges.
+set -uo pipefail
+
+VENDOR=04f9 # Brother
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
+bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; }
+warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
+fix()  { printf '    → %s\n' "$*"; }
+
+echo "P-touch access check"
+
+# ---------------------------------------------------------------- enumeration
+node="" sysdev=""
+for d in /sys/bus/usb/devices/*/; do
+	[ "$(cat "$d/idVendor" 2>/dev/null)" = "$VENDOR" ] || continue
+	sysdev="$d"
+	node=$(printf '/dev/bus/usb/%03d/%03d' "$(cat "$d/busnum")" "$(cat "$d/devnum")")
+	product=$(cat "$d/product" 2>/dev/null || echo "unknown")
+	pid=$(cat "$d/idProduct" 2>/dev/null)
+	break
+done
+
+if [ -z "$node" ]; then
+	bad "no Brother ($VENDOR:*) device on the USB bus"
+	fix "check the cable and that the printer is powered on"
+	fix "lsusb can come up empty in restricted shells; this script reads sysfs directly"
+	exit 1
+fi
+ok "found $product ($VENDOR:$pid) at $node"
+
+# ------------------------------------------------------------------ ptouch CLI
+if command -v ptouch-print >/dev/null 2>&1; then
+	ok "ptouch-print on PATH"
+	if ! ptouch-print --list-supported 2>/dev/null | tr -s ' \t' '\n' | grep -qi "^PT-"; then
+		warn "could not read the supported-model list"
+	fi
+else
+	bad "ptouch-print is not on PATH"
+	fix "install it (NixOS: environment.systemPackages = [ pkgs.ptouch-print ])"
+fi
+
+# ------------------------------------------------------------ node permissions
+read -r owner group mode < <(stat -c '%U %G %a' "$node")
+if [ "$mode" -ge 660 ] 2>/dev/null && [ "$mode" != 664 ]; then
+	ok "node is $owner:$group mode $mode"
+else
+	warn "node is $owner:$group mode $mode (stock is root:lp 664 — rule may not have applied)"
+fi
+
+me=$(id -un)
+if getfacl -p "$node" 2>/dev/null | grep -q "^user:$me:.*r.*w"; then
+	ok "ACL grants $me read/write (uaccess applied)"
+	acl=yes
+else
+	bad "no ACL for $me on the node"
+	acl=no
+fi
+
+if id -nG | tr ' ' '\n' | grep -qx "$group"; then
+	ok "$me is in the '$group' group (fallback path available)"
+	grp=yes
+else
+	warn "$me is NOT in '$group' — the GROUP/MODE fallback will not help"
+	grp=no
+fi
+
+# ------------------------------------------------------- rule presence + order
+# uaccess is consumed by systemd's 73-seat-late.rules, so a rule that sets the
+# tag from a file sorting at or after 73 is applied too late to have any effect.
+rulefile=$(grep -rls "$VENDOR" /etc/udev/rules.d/ /run/udev/rules.d/ 2>/dev/null | head -1)
+if [ -z "$rulefile" ]; then
+	bad "no udev rule mentioning vendor $VENDOR"
+	fix "add: SUBSYSTEM==\"usb\", ATTR{idVendor}==\"$VENDOR\", ATTR{idProduct}==\"$pid\", TAG+=\"uaccess\", GROUP=\"lp\", MODE=\"0660\""
+else
+	base=$(basename "$rulefile")
+	prio=${base%%-*}
+	if grep -q "uaccess" "$rulefile" && [ "$prio" -ge 73 ] 2>/dev/null; then
+		bad "rule is in $base — uaccess is consumed by 73-seat-late.rules, so this is TOO LATE"
+		fix "ship it as a file sorting before 73 (e.g. 70-ptouch-print.rules)"
+		fix "on NixOS use services.udev.packages, NOT services.udev.extraRules (that writes 99-local.rules)"
+	else
+		ok "rule in $base sorts before 73-seat-late.rules"
+	fi
+fi
+
+# --------------------------------------------------- node older than ruleset?
+# A node created before the current ruleset loaded was never evaluated against
+# it, which looks exactly like a broken rule.
+if [ -e /run/current-system ] && [ "$acl" = no ]; then
+	gen_epoch=$(stat -c '%Y' /run/current-system 2>/dev/null || echo 0)
+	dev_epoch=$(stat -c '%Y' "$sysdev" 2>/dev/null || echo 0)
+	if [ "$dev_epoch" -lt "$gen_epoch" ]; then
+		bad "device predates the active system generation — it never saw the current rules"
+		fix "unplug and replug the printer (udev rules only fire on device events)"
+	fi
+fi
+
+# --------------------------------------------------------------- can we open it
+echo "live open test"
+if command -v ptouch-print >/dev/null 2>&1; then
+	out=$(timeout 30 ptouch-print --info 2>&1)
+	if printf '%s' "$out" | grep -q "LIBUSB_ERROR_ACCESS"; then
+		bad "libusb cannot open the device (permission)"
+		[ "$acl" = no ] && [ "$grp" = no ] && fix "neither the ACL nor group membership grants access — see above"
+	elif printf '%s' "$out" | grep -q "media width"; then
+		ok "opened it; $(printf '%s' "$out" | grep 'media width' | tr -d '\n')"
+		err=$(printf '%s' "$out" | grep -o 'error = 0x[0-9a-fA-F]*')
+		case "$err" in
+		"error = 0x0000") ok "printer reports no error" ;;
+		"") warn "no error field reported" ;;
+		*) bad "printer reports $err (tape jam, cover open, or empty cassette)" ;;
+		esac
+	else
+		warn "unexpected output from --info:"
+		printf '%s\n' "$out" | sed 's/^/      /'
+	fi
+else
+	warn "skipped (no ptouch-print)"
+fi

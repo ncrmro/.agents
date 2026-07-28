@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Print P-touch labels with sane margins, a length estimate, and a preview.
+#
+#   label-print art-c3-b5685c                 one label
+#   label-print -n art-c3 art-s3 art-wroom    batch, chained (one lead-in total)
+#   label-print --dry art-c3-b5685c           preview only, no tape used
+#   label-print -s 40 art-c3-b5685c           explicit font size
+#
+# Encodes the geometry lessons so they don't have to be re-learned:
+#   * auto font sizing is usually far larger than wanted for a board sticker
+#   * --pad is positional; a trailing pad keeps text clear of the cut, while a
+#     leading pad only adds to the ~25 mm mechanical lead-in and wastes tape
+#   * that lead-in is paid PER LABEL unless labels are chained
+set -uo pipefail
+
+FONTSIZE=30
+PAD=40
+DRY=0
+CHAIN=0
+DPI=180
+
+usage() {
+	sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+	exit "${1:-0}"
+}
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	-s | --fontsize) FONTSIZE="$2"; shift 2 ;;
+	-p | --pad) PAD="$2"; shift 2 ;;
+	-n | --chain) CHAIN=1; shift ;;
+	--dry | --dry-run) DRY=1; shift ;;
+	-h | --help) usage 0 ;;
+	--) shift; break ;;
+	-*) echo "unknown option: $1" >&2; usage 2 ;;
+	*) break ;;
+	esac
+done
+[ $# -gt 0 ] || usage 2
+
+command -v ptouch-print >/dev/null 2>&1 || {
+	echo "ptouch-print not found; run ptouch-doctor" >&2
+	exit 127
+}
+
+px_to_mm() { awk -v p="$1" -v d="$DPI" 'BEGIN { printf "%.1f", p / d * 25.4 }'; }
+
+# Preview each label first — free, and it catches a too-large font before tape
+# is spent. --force-tape-width lets this work even with no printer attached.
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+total=0
+echo "labels:"
+for text in "$@"; do
+	out=$(ptouch-print --force-tape-width=120 --fontsize "$FONTSIZE" \
+		--writepng "$tmp/preview.png" --text "$text" 2>&1)
+	# --writepng does not report "image size" the way printing does, so take the
+	# width from the PNG's IHDR (big-endian uint32 at byte offset 16).
+	wpx=$(od -An -tu1 -j16 -N4 "$tmp/preview.png" 2>/dev/null |
+		awk '{ print $1*16777216 + $2*65536 + $3*256 + $4 }')
+	if [ -z "$wpx" ]; then
+		echo "  ! could not render '$text':" >&2
+		printf '%s\n' "$out" | sed 's/^/    /' >&2
+		exit 1
+	fi
+	wpx=$((wpx + PAD))
+	total=$((total + wpx))
+	printf '  %-28s %5s px  ≈ %s mm\n' "$text" "$wpx" "$(px_to_mm "$wpx")"
+done
+
+lead=25
+if [ "$CHAIN" = 1 ]; then
+	echo "tape: ≈ $(px_to_mm "$total") mm printed + ~${lead} mm lead-in (chained, paid once)"
+else
+	n=$#
+	echo "tape: ≈ $(px_to_mm "$total") mm printed + ~$((lead * n)) mm lead-in (${n} × ~${lead} mm)"
+	[ "$n" -gt 1 ] && echo "      pass -n to chain them and pay the lead-in once"
+fi
+
+if [ "$DRY" = 1 ]; then
+	echo "dry run — nothing printed"
+	exit 0
+fi
+
+# Build one invocation. Trailing --pad only: a leading pad would just extend the
+# mechanical lead-in that is already there.
+args=(--fontsize "$FONTSIZE")
+[ "$CHAIN" = 1 ] && args+=(--chain)
+first=1
+for text in "$@"; do
+	[ "$CHAIN" = 1 ] && [ "$first" = 0 ] && args+=(--precut)
+	args+=(--text "$text" --pad "$PAD")
+	first=0
+done
+
+echo "printing…"
+if ! out=$(timeout 300 ptouch-print "${args[@]}" 2>&1); then
+	printf '%s\n' "$out" | sed 's/^/  /'
+	echo "print failed; run ptouch-doctor" >&2
+	exit 1
+fi
+printf '%s\n' "$out" | sed 's/^/  /'
+
+# ptouch-print can exit quietly having done nothing, so confirm with the printer.
+# It stays busy for a moment after a job and answers --info with nothing at all,
+# so retry rather than reporting a false "could not read status".
+status=""
+for _ in 1 2 3 4; do
+	status=$(timeout 30 ptouch-print --info 2>&1 | grep -o 'error = 0x[0-9a-fA-F]*')
+	[ -n "$status" ] && break
+	sleep 2
+done
+case "$status" in
+"error = 0x0000") echo "done — printer reports no error" ;;
+"") echo "warning: could not read printer status" >&2 ;;
+*) echo "warning: printer reports $status" >&2; exit 1 ;;
+esac
