@@ -21,6 +21,7 @@ infrastructure repositories.
 - [Request and use a token in Actions](#request-and-use-a-token-in-actions)
 - [Roll out and verify](#roll-out-and-verify)
 - [Revoke, rotate, and roll back](#revoke-rotate-and-roll-back)
+- [Forgejo runner and workflow traps](#forgejo-runner-and-workflow-traps)
 - [Diagnose failures](#diagnose-failures)
 - [Alternatives](#alternatives)
 - [Upstream references](#upstream-references)
@@ -359,6 +360,68 @@ To roll back a broken control-plane change:
 5. diagnose offline before retrying.
 
 Do not delete existing break-glass credentials as part of the initial rollout.
+
+## Forgejo runner and workflow traps
+
+These failures happen before any token reaches the API server, so the OIDC
+diagnosis order below never gets a chance to run. Triage them first (verified
+on Forgejo 15):
+
+- **Run fails at creation, zero logs, `created_at == updated_at`:** Forgejo
+  rejected the workflow while planning it, and neither the run page, the
+  server journal, nor the runner journal records why. The known trigger is a
+  **job-level `env:` block containing `${{ }}` expressions** (for example
+  `${{ runner.temp }}` or the forge context SHA). Move expression-valued env
+  down to the steps that need it; static strings are fine at job level.
+  Bisect by stripping the workflow to a single `echo` step and adding pieces
+  back — a sibling minimal workflow that runs proves the repo, runner, and
+  trigger are healthy.
+- **Checkout fails after ~30s of connection retries:** docker-backed runner
+  labels (e.g. `ubuntu-latest:docker://…`) execute the job inside a
+  container, but the checkout action clones through the *runner's* configured
+  instance URL. If the runner registers against a loopback or host-local
+  address (`http://127.0.0.1:3001`), that address does not resolve to the
+  forge from inside the job container. Options: run deploy jobs on a
+  host-backed label (`native:host`), or register the runner with an instance
+  URL reachable from job containers. A probe job with no checkout step will
+  pass and hide this — include a checkout in any pipeline smoke test.
+- **No job-log API:** Forgejo 15's API (`/actions/tasks`, `/actions/runs`)
+  exposes statuses but serves no log endpoint, and on-disk actions logs are
+  owned by the forge user. Read logs through the web UI (a browser session),
+  or infer scheduling from the forge/runner journals (`task N repo is …`
+  lines show pickup; their absence during a "failed" run means the run never
+  reached a runner).
+- **Repository moved or renamed:** every name-based identity component
+  (`repository`, `sub`, `workflow_ref`) changes with the owner/name, so
+  RBAC group subjects derived from them silently stop matching. Re-derive
+  the bound group string after any repo move; prefer immutable numeric IDs
+  in claim mappings when the forge emits them.
+- **kubectl ≥ 1.35 removed `auth can-i --resource-name`:** a gate script
+  written as `kubectl auth can-i patch <resource> --resource-name=<name>`
+  errors on every call, and a guard that treats any non-"yes" as denied
+  reports a phantom authorization failure. Use the
+  `verb resource/name` form (`auth can-i patch configmaps/app-config -n ns`).
+  Before blaming RBAC, verify each gate locally with impersonation:
+  `kubectl auth can-i <verb> <resource>/<name> --as='<mapped-username>'
+  --as-group='<mapped-group>'` — the mapped values come from
+  `kubectl auth whoami` run with a live token.
+- **The CI-applied manifest must contain only objects the CI identity may
+  patch:** `kubectl apply` (and `--dry-run=server`) fails on the first
+  unauthorized kind in the file, so one bundled admin-owned object
+  (Namespace, Service, CRD) breaks the whole deploy even though the
+  identity's own objects are fine. Split manifests by owner: an
+  admin-applied infra file for static objects, and a revision-bearing file
+  that CI applies. This also keeps the RBAC minimal instead of growing it
+  to match a kitchen-sink manifest.
+- **Debugging without logs — exfiltrate diagnostics deliberately:** when
+  the forge serves no job logs, add a temporary workflow step that pipes
+  sanitized output to a listener you control on the private network
+  (`{ echo ...; kubectl auth whoami; } 2>&1 | curl --data-binary @- $DIAG`).
+  Safe to include: decoded claim payload, whoami output, HTTP status codes.
+  Never the token itself. A ~10-line `node:http` server appending request
+  bodies to a file is enough on the receiving end. Remove the step once
+  green — its removal commit doubles as a repeatability check of the
+  pipeline.
 
 ## Diagnose failures
 
