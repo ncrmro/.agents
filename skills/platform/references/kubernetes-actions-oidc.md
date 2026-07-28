@@ -364,8 +364,8 @@ Do not delete existing break-glass credentials as part of the initial rollout.
 ## Forgejo runner and workflow traps
 
 These failures happen before any token reaches the API server, so the OIDC
-diagnosis order below never gets a chance to run. Triage them first (verified
-on Forgejo 15):
+diagnosis order below never applies. Triage them first (observed on
+Forgejo 15; the log-API gap persists in 16):
 
 - **Run fails at creation, zero logs, `created_at == updated_at`:** Forgejo
   rejected the workflow while planning it, and neither the run page, the
@@ -393,9 +393,9 @@ on Forgejo 15):
   reached a runner).
 - **Repository moved or renamed:** every name-based identity component
   (`repository`, `sub`, `workflow_ref`) changes with the owner/name, so
-  RBAC group subjects derived from them silently stop matching. Re-derive
-  the bound group string after any repo move; prefer immutable numeric IDs
-  in claim mappings when the forge emits them.
+  RBAC group subjects derived from them stop matching. Re-derive the
+  mapped group after any repo move (immutable numeric IDs avoid this —
+  see the prerequisites section).
 - **kubectl ≥ 1.35 removed `auth can-i --resource-name`:** a gate script
   written as `kubectl auth can-i patch <resource> --resource-name=<name>`
   errors on every call, and a guard that treats any non-"yes" as denied
@@ -411,11 +411,10 @@ on Forgejo 15):
   (Namespace, Service, CRD) breaks the whole deploy even though the
   identity's own objects are fine. Split manifests by owner: an
   admin-applied infra file for static objects, and a revision-bearing file
-  that CI applies. This also keeps the RBAC minimal instead of growing it
-  to match a kitchen-sink manifest.
-- **Debugging without logs — exfiltrate diagnostics deliberately:** when
-  the forge serves no job logs, add a temporary workflow step that pipes
-  sanitized output to a listener you control on the private network
+  that CI applies — which also keeps the CI role small.
+- **Debugging without logs — exfiltrate diagnostics deliberately:** add a
+  temporary workflow step that pipes sanitized output to a listener you
+  control on the private network
   (`{ echo ...; kubectl auth whoami; } 2>&1 | curl --data-binary @- $DIAG`).
   Safe to include: decoded claim payload, whoami output, HTTP status codes.
   Never the token itself. A ~10-line `node:http` server appending request

@@ -145,15 +145,16 @@ and recovery.
 ## Kubernetes ingress client source addresses
 
 Source-IP allowlists (`whitelist-source-range` and friends) only work when the
-ingress controller sees real client addresses, and that property is fragile:
+ingress controller sees real client addresses — which several common setups
+break:
 
 - `hostNetwork: false` + `hostPort` routes ingress traffic through the CNI
   portmap/flannel path, which can masquerade every client to the node's cni0
-  address (e.g. `10.42.0.1`) — a Kubernetes/k3s upgrade can introduce this
-  silently, turning every allowlisted route into a uniform 403. Diagnose from
+  address (e.g. `10.42.0.1`) — a Kubernetes/k3s upgrade can introduce this,
+  turning every allowlisted route into a uniform 403. Diagnose from
   the controller's access log: if all requests share one pod-network source,
   the client IP is gone before nginx sees it.
-- The robust bare-metal pattern is `hostNetwork: true` (+
+- On bare metal, use `hostNetwork: true` (+
   `dnsPolicy: ClusterFirstWithHostNet`, hostPort disabled): the controller
   binds 80/443 directly and sees real sources.
 - Single-node trap when switching to hostNetwork: a RollingUpdate deadlocks —
