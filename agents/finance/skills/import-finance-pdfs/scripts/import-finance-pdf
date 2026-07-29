@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  printf 'Usage: import-finance-pdf [--ocr] SOURCE.pdf YYYY-MM-DD-name\n' >&2
+  exit 2
+}
+
+ocr=0
+if [ "${1:-}" = "--ocr" ]; then
+  ocr=1
+  shift
+fi
+
+[ "$#" -eq 2 ] || usage
+source_pdf=$1
+document_name=$2
+
+[ -f "$source_pdf" ] || {
+  printf 'import-finance-pdf: source does not exist: %s\n' "$source_pdf" >&2
+  exit 1
+}
+
+case "$source_pdf" in
+  *.pdf | *.PDF) ;;
+  *)
+    printf 'import-finance-pdf: source must be a PDF: %s\n' "$source_pdf" >&2
+    exit 1
+    ;;
+esac
+
+if ! [[ "$document_name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  printf 'import-finance-pdf: name must match YYYY-MM-DD-lowercase-kebab-case\n' >&2
+  exit 1
+fi
+
+command -v docling >/dev/null 2>&1 || {
+  printf 'import-finance-pdf: docling is required but is not on PATH.\n' >&2
+  printf 'HINT: install it with: uv tool install docling\n' >&2
+  exit 127
+}
+
+finance_docs_dir=${FINANCE_DOCS_DIR:-"$HOME/notes/docs/personal/finances"}
+destination="$finance_docs_dir/$document_name.md"
+
+[ ! -e "$destination" ] || {
+  printf 'import-finance-pdf: destination already exists: %s\n' "$destination" >&2
+  exit 1
+}
+
+conversion_dir=$(mktemp -d)
+trap 'rm -rf "$conversion_dir"' EXIT
+
+ocr_args=(--no-ocr)
+if [ "$ocr" -eq 1 ]; then
+  ocr_args=(--ocr)
+fi
+
+docling convert "$source_pdf" \
+  --to md \
+  "${ocr_args[@]}" \
+  --image-export-mode placeholder \
+  --output "$conversion_dir"
+
+mapfile -t markdown_files < <(find "$conversion_dir" -maxdepth 1 -type f -name '*.md' -print)
+[ "${#markdown_files[@]}" -eq 1 ] || {
+  printf 'import-finance-pdf: expected one Markdown output, found %s\n' "${#markdown_files[@]}" >&2
+  exit 1
+}
+
+install -d -m 700 "$finance_docs_dir"
+install -m 600 "${markdown_files[0]}" "$destination"
+printf '%s\n' "$destination"
