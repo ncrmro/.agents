@@ -1,10 +1,5 @@
 {
   "mcpServers": {
-    "devenv": {
-      "type": "stdio",
-      "command": "devenv",
-      "args": ["mcp"]
-    },
     "playwright": {
       "type": "stdio",
       "command": "mcp-server-playwright",

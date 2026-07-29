@@ -189,6 +189,17 @@ normal and routinely misread.
    source both.
 3. Gitignore `<app>/.env.local` — being an ignored file is what makes it safe to
    rewrite per checkout.
+4. Register the devenv MCP in the **project's** `.agents/mcp.json`, never the
+   global layer — it exits immediately where there is no `devenv.nix`, so a
+   global entry is a failed server in every non-devenv repo:
+
+   ```json
+   {
+     "mcpServers": {
+       "devenv": { "command": "devenv", "args": ["mcp"], "transport": "stdio" }
+     }
+   }
+   ```
 4. Change each process `exec` to allocate, and set the framework's strict-port.
 5. Point the test runner's base URLs at the record, behind existing overrides.
 
@@ -206,9 +217,10 @@ processes from `devenv up -d`, so a self-daemonized server is invisible
 (`list_processes` returns "No native process manager running" while servers are
 up); for a process it does see it knows the *command*, not the port actually
 bound; and it is scoped to one project's state directory, so it never sees
-another worktree. Use it to control processes you started with `devenv up -d`.
-It also exits immediately where there is no `devenv.nix`, so a global MCP entry
-shows as a failed server in non-devenv projects.
+another worktree. Use it to control processes you started with `devenv up -d`,
+and register it in the project's `.agents/mcp.json` rather than the global
+layer: it exits immediately where there is no `devenv.nix`, so a global entry
+is a failed server in every non-devenv repo.
 
 ## Limits
 
