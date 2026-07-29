@@ -5,6 +5,19 @@ This repository is the canonical, project-agnostic Outfitter v1 layer for shared
 - Contribution rules (scope, change standards): @CONTRIBUTING.md
 - Adoption flow, machine setup, live source overrides, and validation: @docs/runbook/agent.dotfile-development.md
 
+## Always work on `main`
+
+Commit straight to `main`. No feature branches, and no worktrees.
+
+This is not a style preference. `~/.agents` is a live symlink into this
+checkout, so whatever branch is checked out is what every agent on the machine
+loads right now. Checking out a branch silently changes the global catalog:
+a skill committed on another branch disappears from `~/.agents/skills` until
+you switch back, and an agent mid-task loses it without any error. Work sitting
+on a branch also configures nothing, because nothing reads that branch.
+
+If a change is risky, make it small and land it; do not park it on a branch.
+
 ## Native v1 precedence
 
 Outfitter resolves resources from highest to lowest precedence: project `.agents/`, global `~/.agents/`, then `sources` in listed order. This repository is the global layer, so its agents and skills override configured remote catalogs. New or modified resources start here, then trickle upstream after they have proved reusable.
