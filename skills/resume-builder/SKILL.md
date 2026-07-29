@@ -16,6 +16,8 @@ Read these supporting docs when needed:
   variants, and publication state.
 - `references/website-sync.md` — discovering and updating a resume website
   without making it a second source of truth.
+- `references/source-recovery.md` — recovering work history from legacy sites,
+  repository history, bookmark managers, and archived resumes.
 - `assets/scaffold/` — starter files for an empty resume root.
 
 ## Default decision
@@ -48,9 +50,10 @@ publication target, not the canonical work-history database.
 2. **Inventory before editing.**
    - List canonical roles, projects, claim IDs, variants, and publication
      targets.
-   - Compare the record with the current resume website and any supplied resume
-     files.
+   - Compare the record with the current resume website, repository history,
+     bookmarked sources, and any supplied resume files.
    - Report contradictions, stale open-ended roles, and unverified claims.
+   - For a legacy bootstrap, follow `references/source-recovery.md`.
 3. **Update canonical facts first.**
    - Add or amend `work-history/` and `projects/` records.
    - Give each reusable achievement a stable claim ID.
