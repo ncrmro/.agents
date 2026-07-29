@@ -23,6 +23,10 @@ delegation mechanism: delegate by sending, collect by reading the reply.
 - Resident agent endpoint: `link:vega` (namespace `agent-vega`); its
   conversation is a singleton — every peer and channel shares the
   `link:vega` thread.
+- Additional agents run their own pods as relay **clients**: no listener, no
+  Service, no `AGENT_RELAY_SERVER`. They dial the same public NodePort URL
+  (the hairpin works from any namespace) with their own token and principal —
+  e.g. `link:drago` in `agent-drago`. One relay server, N clients.
 - Operator principal: `vega-web`; its token lives in the cluster secret
   `-n vega secret/vega-agent-session` (keys `relayUrl`, `operatorToken`).
   Never print tokens; pull them straight into env.
