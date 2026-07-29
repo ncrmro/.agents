@@ -1,4 +1,0 @@
-interface:
-  display_name: "Import Finance PDFs"
-  short_description: "Convert finance PDFs into dated Markdown"
-  default_prompt: "Use $import-finance-pdfs to import a financial PDF into the personal finance document archive."
