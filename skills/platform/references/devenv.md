@@ -51,14 +51,14 @@ Self-daemonizing dev servers make sharing the default within one checkout: the d
 
 Etiquette for concurrent agents:
 
-- **Reuse before starting.** Starting is idempotent; run the starter and read the reported URL.
-- **Discover, don't assume, ports.** `astro dev status` returns the URL, pid, and uptime; a busy preferred port falls forward, so hardcoded ports go stale.
+- **Reuse before starting — but check machine-wide first.** Starting is idempotent only *within one app directory*; across directories it always adds a server. Run the check in the `dev-servers` skill before any start.
+- **Discover, don't assume, ports.** `astro dev status` returns the URL, pid, and uptime for the directory it runs in. It cannot answer "is one already running?": it keys on that directory's own lock, so a fresh worktree reports nothing running however many servers are up.
 - **Never stop a server you didn't start.** `astro dev stop` kills it for every agent in the checkout. Prefer `astro dev logs --follow`; hot reload makes restarts rarely necessary.
 - **Worktrees don't share, by design.** Each worktree serves its own code with its own daemons on fall-forward ports; keep origin-checked flows (sign-in) on the checkout that owns the canonical ports.
-- Cold-start races are benign: the lock resolves them; worst case a duplicate lands on the next port.
+- **Duplicates accumulate; they do not resolve.** The singleton lock is per app directory, so between checkouts there is no race for it to settle — each start adds a daemon that survives until stopped. Observed on a real machine: five daemons across four worktrees, one twenty-one fall-forwards deep, still serving days-old code. Stop what you started, and read a fall-forward port as a signal to look rather than a shrug.
 
 ## Sharp edges
 
 - **Origin allowlists assume the preferred ports.** Auth layers with trusted-origin lists (CORS, better-auth `trustedOrigins`) typically enumerate the conventional ports. A server that fell forward to another port still serves pages, but origin-checked flows (sign-in) fail there. Keep the preferred ports free for the primary checkout; treat fall-forward instances as read-mostly.
-- **Port fall-forward is first-come:** which checkout gets 4000 depends on start order. If a specific instance must own the port, stop the other instance rather than pinning strict ports.
+- **Port fall-forward is first-come:** which checkout gets 4000 depends on start order. If a specific instance must own the port, stop the other instance rather than pinning strict ports. Pinning (Vite's `server.strictPort`) would make a duplicate start fail loudly instead of quietly taking the next port, which is the failure mode this standard trades away deliberately — parallel worktrees could no longer start at all. Worth revisiting only as its own decision, weighed against the previous bullet: a fall-forward instance of an auth-gated app cannot exercise the flows it exists to serve.
 - **Don't background-manage twice.** If a framework daemonizes itself, do not also wrap it in tmux/nohup/systemd in dev; you'll strand servers no tool knows about.
