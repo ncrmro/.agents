@@ -9,12 +9,13 @@ Start with the sources already under the user's control:
 
 1. prior resume/CV files and exports;
 2. the full Git history of an old resume or personal website;
-3. bookmark-manager entries and archived links;
-4. public profiles, talks, project pages, and employer pages;
+3. professional profiles such as LinkedIn;
+4. talks, project pages, employer pages, bookmarks, and archived links;
 5. user confirmation.
 
-A bookmark is a lead, not proof. Its title, notes, tags, and saved URL can help
-locate evidence, but a dead or inaccessible target does not verify the claim.
+A directly visible user-owned professional profile can support titles and
+dates. Search-result snippets, scraped profile aggregators, bookmarks, and dead
+links are leads, not proof.
 
 ## Recover from Git, not only the working tree
 
@@ -33,24 +34,39 @@ automatically more factual: it may be a design cleanup, title rewrite, or
 abbreviation. Preserve richer earlier claims when they remain supported, and
 record title/date conflicts instead of silently choosing one.
 
-## Search bookmark managers
+## Recover from professional profiles
 
-Search by:
+Use a professional profile primarily to establish:
 
-- organization and product names;
-- exact role titles and title variants;
-- project, talk, and repository names;
-- old personal domains and resume URLs;
-- technologies paired with an organization;
-- tags such as `resume`, `career`, `portfolio`, `talk`, or `work`.
+- organization and official role title;
+- start and end month;
+- employment relationship and location, when explicitly shown;
+- whether overlapping entries are concurrent roles, clients, or contracting
+  organizations;
+- current headline and summary.
 
-Open promising targets and capture only the provenance needed to recover the
-fact. Never copy session tokens, private bookmark notes, or unrelated browsing
-data into the resume tree.
+Do not expect the profile to preserve the richest accomplishments. Legacy
+resumes and their Git history often contain more detailed claims; combine those
+claims with the profile's chronology without letting either silently overwrite
+the other.
 
-If the bookmark service or target is unavailable, record the access failure and
-continue with local sources. Do not turn inability to corroborate into a claim
-that the fact is false.
+If direct profile access is blocked by login, robots policy, or an unavailable
+browser session:
+
+- record the canonical profile URL and access date;
+- use search snippets or profile aggregators only to form
+  `needs-verification` leads;
+- do not expose scraped contact details;
+- ask for a profile export, screenshot, or user confirmation when exact fields
+  materially affect the resume.
+
+## Search bookmarks and archives
+
+Bookmarks can still locate old profiles, project pages, talks, and resume
+snapshots. Search by organization, role-title variants, project names, old
+personal domains, and tags such as `resume`, `career`, `portfolio`, or `work`.
+A bookmark's title, notes, tags, and saved URL help locate evidence, but they do
+not verify a dead or inaccessible target.
 
 ## Reconcile
 
