@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hyprland"
+  short_description: "Configure and troubleshoot Hyprland safely"
+  default_prompt: "Use $hyprland to configure or diagnose my Hyprland desktop."
