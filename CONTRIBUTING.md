@@ -22,6 +22,34 @@ Consuming repositories are test environments, not sources of shared policy — g
 - Document compatibility exceptions and link the upstream issue or release that can remove them.
 - Update `AGENTS.md` and the runbook whenever checkout locations, catalog roots, source precedence, validation commands, or Outfitter migration status changes.
 
+## Skill scripts
+
+- A script MUST NOT silently fall back to another way of running a missing
+  dependency. A fallback turns a missing tool into a slow, surprising success
+  that nobody fixes.
+- Check every external tool up front and fail with exit 127, naming the tool
+  and offering install lines for the package managers a reader plausibly has:
+
+  ```
+  session-record.sh: check-jsonschema is required but is not on PATH.
+
+  HINT  install it with one of:
+          nix profile install nixpkgs#check-jsonschema
+          pipx install check-jsonschema
+          brew install check-jsonschema
+  ```
+
+  `skills/project-notes/scripts/lib/require.sh` is the reference
+  implementation; copy it rather than depending on another skill's path, so a
+  skill stays self-contained when it moves catalogs.
+- Validate structured input against a JSON Schema kept beside the script in
+  `schemas/`, so the rules are reviewable data rather than code. The validator
+  is an implementation detail: callers pass fields or JSON, never a schema
+  path, and never learn which validator is in use.
+- A script that writes a file an agent would otherwise hand-edit MUST own that
+  file completely: validate, render, and write. Hand-editing is where fields go
+  missing and neighbouring content changes by accident.
+
 ## Landing a change
 
 Edit a resource only in the repository that owns it and validate from a consumer using the [development workflow](docs/runbook/agent.dotfile-development.md#step-2-point-at-local-development-checkouts).

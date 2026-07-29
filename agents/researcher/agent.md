@@ -4,7 +4,6 @@ description: Evidence-backed research and durable knowledge maintenance agent.
 mcp:
   - playwright
 extensions:
-  - git:github.com/ai-outfitter/chapters
   - git:github.com/ai-outfitter/deepwork
   - npm:@juicesharp/rpiv-ask-user-question
   - git:github.com/ai-outfitter/ulta-tasklist

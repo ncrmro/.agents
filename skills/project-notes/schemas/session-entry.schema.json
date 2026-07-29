@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ncrmro.com/agents/schemas/project-notes/session-entry.json",
+  "title": "SESSIONS.md entry",
+  "description": "The JSON an agent generates for scripts/session-record.sh, which validates it, renders the entry, and writes it. `session` is the key: recording the same session again updates its entry in place rather than adding a second one, so a long session can be recorded when it starts and refined as it goes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session",
+    "date",
+    "subject",
+    "agent",
+    "branch",
+    "repo",
+    "worktree",
+    "head",
+    "work",
+    "refs",
+    "next"
+  ],
+  "properties": {
+    "session": {
+      "type": "string",
+      "minLength": 4,
+      "pattern": "^[A-Za-z0-9._:-]+$",
+      "description": "Harness session id. The key: it identifies which entry to update, so it must be the same string every time this session is recorded."
+    },
+    "status": {
+      "enum": [
+        "in-progress",
+        "done",
+        "abandoned"
+      ],
+      "default": "done",
+      "description": "in-progress while the session is still running; done when it ended; abandoned when it stopped without finishing. A reader treats an in-progress entry's `next:` as live."
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Absolute, never relative."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 120,
+      "pattern": "^[^#\\n]+$",
+      "description": "What the session did, as a heading. No markdown heading marker; the renderer adds it."
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[^\\n]+$",
+      "description": "Harness and model, e.g. 'claude-code \u00b7 opus-5'. The model is not in the environment \u2014 state it."
+    },
+    "resume": {
+      "type": "string",
+      "description": "Command that resumes this session. Omit rather than invent one; the renderer writes 'not resumable' when absent."
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+    },
+    "worktree": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The path that gets a later reader back to the files."
+    },
+    "head": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Tip commit at the end of the session, so a reader can tell what has since been rebased away."
+    },
+    "work": {
+      "type": "string",
+      "minLength": 40,
+      "description": "What changed and what it proves. Carry the evidence class: a VM proof is not a physical-host claim, a read-only audit is not a change. Name what the result did not establish."
+    },
+    "refs": {
+      "type": "string",
+      "minLength": 4,
+      "description": "Issues and PRs as [Issue #n](url), joined with ' \u00b7 '. Say 'none' and why when there is no forge item."
+    },
+    "next": {
+      "type": "string",
+      "minLength": 10,
+      "description": "The first thing to do on resume. An entry without it is just a commit log."
+    }
+  }
+}
