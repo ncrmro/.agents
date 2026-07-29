@@ -16,6 +16,8 @@ Supporting documents live next to this `SKILL.md`; read them only when needed:
 - `transcribe.md` — single-track transcription (whisper.cpp) and multi-speaker
   diarization (whisperx), plus optional LLM transcript post-processing.
 - `ffmpeg-edit.md` — cut, speed-adjust, concatenate, and export final media.
+- `references/benchmark.md` — controlled CPU/Vulkan transcription benchmark,
+  interpretation, and reproduction method.
 
 ## Toolchain
 
@@ -82,7 +84,7 @@ speed up body clips first; if under, slow down key moments before padding filler
   alongside the input or under `output/` with the same basename.
 - Never claim GPU acceleration because `whisper-cli` exists. Record the
   classified backend, parsed device label, raw runtime log, and CPU fallback
-  reason.
+  reason. Read `references/benchmark.md` before estimating speedup.
 - Run long `whisper-cli`, `whisperx`, and `ffmpeg` jobs in the background and
   check results when complete.
 - Prefer stream copy (`-c copy`) for lossless cuts when keyframe alignment is
