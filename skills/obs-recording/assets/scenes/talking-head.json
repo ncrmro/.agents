@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "scene": {
+    "name": "Talking Head"
+  },
+  "video": {
+    "baseWidth": 3840,
+    "baseHeight": 2160,
+    "outputWidth": 3840,
+    "outputHeight": 2160,
+    "fps": 60
+  },
+  "sources": [
+    {
+      "name": "Webcam",
+      "role": "camera",
+      "required": true,
+      "visible": true,
+      "kinds": [
+        "pipewire-camera-source"
+      ]
+    }
+  ],
+  "audioInputs": [
+    {
+      "name": "Mic/Aux",
+      "role": "microphone",
+      "required": true,
+      "muted": false,
+      "minGainDb": -60
+    }
+  ],
+  "recording": {
+    "minFreeGiB": 20,
+    "preferredContainers": [
+      "hybrid_mp4",
+      "mkv"
+    ]
+  }
+}

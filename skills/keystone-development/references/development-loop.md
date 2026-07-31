@@ -2,7 +2,7 @@
 
 ## Source-of-truth boundary
 
-`ncrmro/keystone` owns reusable NixOS and Home Manager integration, the `ks`
+`ks.systems/os` owns reusable NixOS and Home Manager integration, the `ks`
 installer, templates, storage/security abstractions, and reusable test
 harnesses.
 
@@ -59,6 +59,43 @@ nix develop --command ./bin/ks-dev --switch <host>
   filesystems, encryption, bootloader, Secure Boot, resume, and risky network
   changes.
 - `--switch`: activate immediately only when live activation is safe.
+
+## Agent-build, human-switch handoff
+
+For a local physical host, prefer this split when the agent cannot answer an
+interactive sudo prompt:
+
+1. The agent runs the relevant evaluations, tests, and:
+
+   ```bash
+   nix develop --command ./bin/ks-dev --build <host>
+   closure="$(readlink -f result)"
+   test -x "$closure/bin/switch-to-configuration"
+   printf '%s\n' "$closure"
+   ```
+
+2. The agent gives the human that exact, already-built closure.
+3. The human activates it without reevaluation, network access, or rebuilding:
+
+   ```bash
+   sudo nixos-rebuild switch --store-path <exact-closure>
+   ```
+
+4. The agent resumes immediately and verifies the service/runtime behavior plus
+   both pointers:
+
+   ```bash
+   readlink -f /run/current-system
+   readlink -f /nix/var/nix/profiles/system
+   ```
+
+Both pointers must equal the intended closure after a persistent switch.
+
+Do not use `<closure>/bin/switch-to-configuration switch` as the normal
+handoff. It activates the closure but does not advance the system profile, so
+the next boot can silently return to the previous generation. Use
+`nixos-rebuild --store-path`; it skips evaluation/build while preserving normal
+profile and bootloader semantics.
 
 For remote targets, let `ks-dev` resolve `hosts.nix` or the configured SSH
 target. Inspect the command implementation before replacing it with an ad hoc
@@ -135,7 +172,7 @@ Inspect these before relying on older narrative docs:
 - `ks-config/bin/ks-dev` and `bin/dev-keystone`
 - `ks-config/flake.nix`, `flake.lock`, `hosts.nix`, and the target `hosts/`
   directory
-- `keystone/modules/`, `lib/templates.nix`, and `packages/ks/`
-- `keystone/templates/default/bin/test-iso`
-- `keystone/bin/virtual-machine`, `bin/test-e2e`, and
+- `ks.systems/os/modules/`, `lib/templates.nix`, and `packages/ks/`
+- `ks.systems/os/templates/default/bin/test-iso`
+- `ks.systems/os/bin/virtual-machine`, `bin/test-e2e`, and
   `bin/test-microvm-tpm`

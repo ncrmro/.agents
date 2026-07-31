@@ -183,23 +183,37 @@ scripts read either. When you touch one, migrate it in the same run: `mv
 <slug>.md <slug>/README.md`, add `SESSIONS.md`, and repoint the inbound links
 (step 5).
 
-### 2. Gather forge state
+### 2. Gather project and forge state
+
+Run both project-notes gatherers before hand-editing a project page, especially
+when the request says to find, document, resume, or reconcile work across repos:
 
 ```sh
+~/.agents/skills/project-notes/scripts/state.sh <slug>
 ~/.agents/skills/project-notes/scripts/gather.sh <slug> --since <last refresh>
 ```
 
-It reads `repos:` from the page frontmatter, picks the forge from each clone's
-`origin` remote, and prints open PRs, open issues, milestones, and items closed
-since the given date. `--help` covers the other forms; run `--since` alone,
-since its output is a superset of the bare form's.
+`state.sh` is the project-notes copy of the graph-state gatherer, reworked for
+this skill: it reads `repos:` from the page frontmatter and prints graph-ready
+current state for each repo — last release, shipped commits, open PR lanes,
+release prediction, milestone directories, and milestone issues. Use it to see
+what is in flight (`◉`), what shipped (`●`), what is planned (`○`), and which
+repo owns each cross-project dependency before writing prose or task rows. It is
+read-only except for a rate-limited `git fetch --tags` in matching local
+checkouts.
 
-For release state, shipped commits, and milestone directories, run
-`project-planning`'s `scripts/state.sh` instead; it accepts several repos in one
-call.
+`gather.sh` reads the same `repos:` list, picks the forge from each clone's
+`origin` remote, and prints vault-ready open PRs, open issues, milestones, and
+items closed since the given date. `--help` covers the other forms; run
+`--since` alone when refreshing a page, since its output is a superset of the
+bare form's.
 
-Anything not in the gathered output or read directly from the forge does not go
-on the page.
+`project-planning` still owns the projected-git-graph design language and any
+canonical `PLAN.md` graph. This skill's `state.sh` is only the evidence-gathering
+copy used to keep project notes honest.
+
+Anything not in `state.sh`, `gather.sh`, or read directly from the forge/local
+files does not go on the page.
 
 ### 3. Update README.md
 

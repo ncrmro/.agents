@@ -1,11 +1,11 @@
 ---
 name: keystone-development
-description: Develop, architect, install, deploy, test, and diagnose Keystone OS through the ncrmro/keystone platform repo, ncrmro/ks-config consumer flake, and ncrmro/dotfiles. Use for deciding whether dotfiles, Home Manager, NixOS, or Kubernetes owns a change; local Keystone module iteration; remote NixOS work on real hardware; nixos-anywhere and disko installs; Secure Boot and LUKS enrollment; or build-vm/direct-image/libvirt/microVM testing.
+description: Develop, architect, install, deploy, test, and diagnose Keystone OS through the ks.systems/os platform repo, ncrmro/ks-config consumer flake, and ncrmro/dotfiles. Use for ks-dev build/switch workflows; deciding whether dotfiles, Home Manager, NixOS, or Kubernetes owns a change; local Keystone module iteration; remote NixOS work on real hardware; nixos-anywhere and disko installs; Secure Boot and LUKS enrollment; or build-vm/direct-image/libvirt/microVM testing.
 ---
 
 # Keystone development
 
-Treat `keystone` as the reusable platform and `ks-config` as the fleet consumer
+Treat `ks.systems/os` as the reusable platform and `ks-config` as the fleet consumer
 and deployment entry point. Start with the lowest validation tier that can
 exercise the behavior; use real hardware only for behavior that depends on
 physical firmware or devices.
@@ -92,10 +92,14 @@ For a Keystone change consumed by a `ks-config` host:
    ```
 
 3. Run the smallest relevant VM tier.
-4. Use `--boot` for boot/initrd changes; use the default `--switch` only for
-   changes that are safe to activate live.
-5. After a successful build, verify the runtime behavior.
-6. Commit and push Keystone first when publishing. Then update only the
+4. For a local physical host, prefer the agent-build/human-switch handoff in
+   `references/development-loop.md`: the agent proves and reports the exact
+   closure, then the human activates it with `nixos-rebuild --store-path`.
+5. Use `--boot` for boot/initrd changes; use `switch` only for changes that are
+   safe to activate live.
+6. After a successful activation, verify the runtime behavior and that the
+   live system and system profile both resolve to the intended closure.
+7. Commit and push Keystone first when publishing. Then update only the
    `keystone` input in `ks-config`, rebuild, and commit the lock update.
 
 Never run a bare `nix flake update` in `ks-config`. Update only the intended

@@ -6,17 +6,24 @@ scheduled: null
 posted: null
 ---
 
-<!-- Longform X article, course/roadmap form. Structure mirrors pieces like
-     "Graph Engineering with Claude: 14-Step roadmap from 0 to graph architect":
-     hook → reframe → N numbered lessons (each with a concrete artifact) →
-     applications → aphoristic close. Keep the HTML comments while drafting;
-     delete them before scheduling. -->
+<!-- Longform article, course/roadmap form — an X article, a LinkedIn article
+     or your own blog; the structure is the same, see platforms.md for what
+     differs. Mirrors pieces like "Graph Engineering with Claude: 14-Step
+     roadmap from 0 to graph architect": hook → reframe → N numbered lessons
+     (each with a concrete artifact) → applications → aphoristic close. Keep
+     the HTML comments while drafting; delete them before scheduling. -->
 
-<!-- COVER: X articles show a wide cover image (~2.5:1). Note the intended
-     image here; the user attaches it when publishing. -->
+<!-- COVER: a wide cover image (5:2 on X). Note the intended image and its
+     alt text here; the user attaches it when publishing. -->
 
-<!-- HOOK, 3-5 short paragraphs (one to two sentences each — X articles read
-     as a fast vertical scroll). Name the failure mode the reader is living
+<!-- RENDERING: check platforms.md before drafting. X articles have no
+     monospace and no code block — pasted ASCII keeps its line breaks and loses
+     its alignment, so any diagram, aligned table or code listing has to be
+     planned here as an IMAGE with alt text, not written as a fenced block and
+     fixed later. -->
+
+<!-- HOOK, 3-5 short paragraphs (one to two sentences each — articles on these
+     surfaces read as a fast vertical scroll). Name the failure mode the reader is living
      right now, concretely and a little vividly: "Most people who try to build
      a multi-step agent end up with a straight line. Step one, step two, step
      three - each waiting politely for the last to finish." Then twist the

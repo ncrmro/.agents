@@ -10,7 +10,9 @@ the installed version, apply the smallest live change, verify the result, and on
 then persist it in configuration.
 
 Read `references/monitors.md` completely when positioning, enabling, disabling,
-scaling, rotating, or troubleshooting displays.
+scaling, rotating, or troubleshooting displays. Read
+`references/window-formatting.md` before sizing a window to a recording canvas
+or fixed aspect ratio.
 
 ## The trap that wastes an afternoon
 
@@ -55,6 +57,10 @@ user's configuration structure and ownership boundaries; do not assume
 
 ## Live changes
 
+- To resize one workspace's tiled center-master window to a fixed aspect ratio,
+  preview `scripts/center-window-for-format.sh WIDTHxHEIGHT --workspace NAME
+  --dry-run`; workspace selection is mandatory. Read
+  `references/window-formatting.md` before applying it.
 - Use `hyprctl dispatch ...` for compositor actions.
 - Use `hyprctl keyword ...` to test legacy/hyprlang-style configuration values
   supported by the running version.

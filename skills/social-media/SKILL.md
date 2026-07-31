@@ -1,6 +1,6 @@
 ---
 name: social-media
-description: Draft, schedule, and track social media content — X posts and longform X articles — as markdown files with scheduled/posted frontmatter. Use when writing a post or article, checking what's due to go out, or recording that something was published.
+description: Draft, schedule, and track social media content — microblog posts and threads (X, Bluesky, Threads, Mastodon, LinkedIn), longform articles, vertical short video (Reels, Shorts, TikTok), stories, and image carousels — as markdown files with scheduled/posted frontmatter. Use when writing a post, thread, video script, story sequence, or carousel, adapting one idea across channels, checking what's due to go out, or recording that something was published.
 ---
 
 # Social media
@@ -9,17 +9,37 @@ Draft social content as markdown files in the host project, track each piece
 from idea to published URL via frontmatter, and never auto-post. The human
 publishes; the file records.
 
-Templates (copy, never edit in place):
+Templates are keyed by **artifact shape**, not platform — a Reel, a Short and a
+TikTok are one artifact with three sets of numbers, as are an X post, a Bluesky
+post and a Threads post. Copy a template, never edit it in place.
 
-- `assets/template.x.post.md` — a short-form X post or thread.
-- `assets/template.x.article.md` — a longform X article (course/roadmap style).
+| The idea is… | Template | Typical channels |
+| --- | --- | --- |
+| a claim that fits in a breath, or a numbered spine of them | `assets/template.microblog.md` | X, Bluesky, Threads, Mastodon, LinkedIn |
+| a whole argument or course that earns 1000+ words | `assets/template.article.md` | X article, LinkedIn article, own blog |
+| something you have to *see* happen | `assets/template.short-video.md` | Reels, YouTube Shorts, TikTok |
+| a nudge, a poll, or behind-the-scenes for people already following | `assets/template.story.md` | Instagram / Facebook stories |
+| a sequence of points that reads better swiped than scrolled | `assets/template.carousel.md` | Instagram carousel, LinkedIn document post, X image set |
 
-`README.md` records the real posts these templates are modeled on and the
-three forms an idea takes (standalone article, post funneling to your own
-article, post framing someone else's longform) — read it when revising a
-template or deciding which form an idea wants.
+`platforms.md` holds the per-platform numbers — character and caption limits,
+link and hashtag behavior, durations, aspect ratios, alt-text limits. Read it
+when choosing channels and before writing to a budget.
+
+`README.md` records the real posts these templates are modeled on, which
+templates are grounded in a read exemplar and which are not, and the three forms
+an idea takes (standalone article, post funneling to your own article, post
+framing someone else's longform) — read it when revising a template or deciding
+which form an idea wants.
 
 ## Where drafts live
+
+**If the content has a canonical publication behind it — a blog post, paper or
+talk — the `publication` skill owns it.** The draft belongs in that piece's
+`syndication/` directory and its schedule and posted URL are tracked in the
+publication's frontmatter, not here. This skill still writes the copy; it just
+doesn't own the record. Never syndicate before the canonical has a live URL.
+
+Use the standalone layout below only for content with no canonical behind it.
 
 This skill is project-agnostic — run it from any repo or notes directory. Find
 the posts directory in this order:
@@ -29,7 +49,9 @@ the posts directory in this order:
 2. An existing directory of drafts using this frontmatter (look for `posted:`).
 3. Otherwise create `social/` at the project root and say so.
 
-Name files `YYYY-MM-DD-<slug>.md` (date the draft was started).
+Name files `YYYY-MM-DD-<slug>.md` (date the draft was started). Formats with
+media get a sibling directory `YYYY-MM-DD-<slug>/` for footage and images,
+pointed at by the `media:` field.
 
 ## Frontmatter contract
 
@@ -39,38 +61,127 @@ index to maintain:
 ```yaml
 ---
 title: Short working title
+kind: microblog     # microblog | article | short-video | story | carousel
 platform: x
-kind: post          # post | article
 scheduled: null     # ISO 8601 datetime it should go out, or null (unplanned)
 posted: null        # null until live, then the URL of the published post
+media: null         # optional: asset directory, for video/image formats
 ---
 ```
+
+When one idea goes to several channels, replace `platform:` with a `channels:`
+list carrying its own `scheduled` and `posted` per destination:
+
+```yaml
+---
+title: Plan agent work as Git history
+kind: microblog
+channels:
+  - platform: x
+    scheduled: 2026-07-27T09:00:00-05:00
+    posted: null
+  - platform: bluesky
+    scheduled: 2026-07-27T09:00:00-05:00
+    posted: null
+---
+```
+
+Both forms are valid; use the flat one for single-destination drafts.
 
 The lifecycle is readable from two fields: `posted: null` + `scheduled: null`
 is an idea; `posted: null` + a future `scheduled` is queued; `posted: null` +
 a past `scheduled` is **overdue**; a URL in `posted` is done. When asked
 "what's due" or "what's unposted", grep the drafts directory for
-`posted: null` and compare `scheduled` against today.
+`posted: null` and compare `scheduled` against today. A `channels:` draft is
+done only when no `posted: null` remains in it — partially posted (live on X,
+still queued for Bluesky) is a real and normal state.
+
+## Check the surface before you draft
+
+If the piece depends on something the target surface may not render — monospace,
+code blocks, aligned ASCII, tables, wide images — confirm the surface supports it
+**before** writing, not after. `platforms.md` § Rendering capabilities, and the
+per-platform file in `references/`, answer this in a minute.
+
+Getting it wrong is expensive and quiet: X strips monospace but preserves
+newlines, so a pasted ASCII diagram looks nearly right while its alignment is
+destroyed. A surface that can't render the artifact changes the draft — the
+diagram becomes a planned image with alt text, in the outline, from the start.
 
 ## Workflow
 
-1. **Draft** — copy the right template into the posts directory and fill it
-   in. The templates carry the hook-first structure; keep their section
-   comments while drafting, delete them before scheduling.
+1. **Draft** — pick the template from the table above, copy it into the posts
+   directory and fill it in. The templates carry the hook-first structure; keep
+   their section comments while drafting, delete them before scheduling.
 2. **Review** — run the `prose-reviewer` skill on the draft before it's
-   queued. Social copy is the most outward-facing prose there is, and AI
-   tells in a post get called out publicly.
+   queued, including captions and on-screen text. Social copy is the most
+   outward-facing prose there is, and AI tells in a post get called out
+   publicly.
 3. **Schedule** — set `scheduled`. Convert relative asks ("tomorrow morning")
    to absolute ISO 8601 with the local offset.
-4. **Publish** — the user posts it themselves; publishing to X is never done
-   by this skill. After they post, set `posted` to the live URL. If asked to
-   help publish, the most this skill does is open the compose page and leave
-   the user to submit.
+4. **Publish** — the user posts it themselves; publishing is never done by this
+   skill. After they post, set `posted` to the live URL. If asked to help
+   publish, the most this skill does is load the draft into the compose page and
+   leave the user to submit.
+
+   **The markdown file is canonical; the composer is a render target.** Never
+   patch a live draft to match an edited file — delete the draft, make a new one,
+   and load it once. Re-rendering is slower per round and the only version that
+   stays correct; in-place edits silently duplicate and corrupt content. Read the
+   platform's file in `references/` before touching its editor, and always verify
+   by reloading the draft, never by reading the live page.
+
+## Adapting one idea across channels
+
+Reuse the **claim**. Rewrite the hook, the CTA, and anything platform-shaped.
+Pasting one text into five boxes reads as imported everywhere and native
+nowhere.
+
+- Write to the tightest limit in the target set (`platforms.md`), or create
+  separate versions when the shorter draft would underserve the roomier
+  channels.
+- Strip artifacts that don't belong: `1/` numbering on channels that post as a
+  single block, "link in bio" where links are clickable, another platform's
+  watermark on a re-uploaded video.
+- When a post and an article are the same idea at two resolutions, the post's
+  job is the hook and the funnel — it should not try to teach the whole thing
+  (see `README.md`, exemplar 2).
+- A story is not a smaller Reel. It reaches existing followers only, so it
+  supports a launch rather than carrying one.
+
+## Media handoff
+
+This skill produces the **brief**, never the media. The short-video, story and
+carousel templates specify what to shoot, what the beats are, and what the edit
+must preserve. Production belongs to the skills that already do it:
+
+- `obs-recording` — capture.
+- `media-editor` — transcription, transcript-driven cuts, subtitles, export.
+  The timestamped beat table in `template.short-video.md` is written to feed its
+  edit plan directly.
+
+Don't introduce new video or image tooling here.
 
 ## Boundaries
 
 - Never set `posted` to anything but a real URL the user provides or confirms.
 - Don't invent engagement claims, follower counts, or "as promised in my last
   post" continuity the drafts directory doesn't show.
-- One piece of content per file; a thread is one file (the post template shows
-  the thread form).
+- When adapting prose the user has already written or published, their
+  punctuation and phrasing are the content. Read the source first and preserve
+  it; a colon they chose is not an em dash you prefer. Rewrite only what the new
+  surface actually forces.
+- Ghostwriting in the user's first person carries their authority. Every claim of
+  personal experience must be traceable to something they wrote or did — no
+  invented numbers, durations, or war stories, and no roadmap voice over work
+  that is days old.
+- Alt text is required on every image and carousel slide before scheduling, and
+  burned-in subtitles on every short video. Not optional, not a follow-up task.
+- Don't post on the user's behalf by default — load the composer and let them
+  submit. The exception is a project with an explicit automated publisher the
+  user has authorized: see the `publication` skill and its
+  `references/automation.md` for the preconditions that make that safe
+  (canonical gate, kill switch, idempotency, verify-after-posting). Absent that
+  standing authorization, the user submits.
+- One piece of content per file; a thread is one file, a carousel is one file, a
+  story sequence is one file.

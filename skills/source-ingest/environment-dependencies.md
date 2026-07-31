@@ -1,39 +1,64 @@
 # Environment dependencies
 
-Read this when a source-ingest preflight check reports a missing tool or a tool
-fails at runtime.
+## Nix/NixOS default
 
-## NixOS
+The skill owns its reusable toolchain. Do not require every consuming project
+to add transcription or PDF-ingest packages to its devenv.
 
-Prefer a project devenv over per-command library-path workarounds. The
-environment needs:
-
-- `ffmpeg`
-- `whisper-cpp`
-- `uv`
-- `libxcb`, `libglvnd`, `glib`, `zlib`, and the C++ runtime for Docling's
-  manylinux wheels
-
-Install Docling through uv because the nixpkgs package may be broken:
+Run:
 
 ```bash
-uv tool install docling
+scripts/setup-tools.sh
+scripts/toolchain-doctor.sh
 ```
 
-Run ingestion inside the configured environment:
+The setup script installs these into the user profile:
 
-```bash
-devenv shell -- docling <source.pdf> --to md --output <output-directory> --image-export-mode placeholder
-```
+- `ffmpeg` / `ffprobe`;
+- `jq`;
+- `uv`;
+- `whisper-cpp-vulkan` at priority 4;
+- `libxcb`, `libglvnd`, `glib`, `zlib`, and the GCC runtime for Docling.
 
-If Docling reports a missing shared library, add its providing nixpkgs package
-to the project's devenv rather than setting an ad hoc global
-`LD_LIBRARY_PATH`.
+Docling itself is installed with `uv tool install docling` because its nixpkgs
+package may be broken. The profile library directory is supplied through
+`LD_LIBRARY_PATH` when Docling runs.
 
-## Whisper models
+The setup leaves an existing CPU `whisper-cpp` profile element intact but gives
+the Vulkan element higher precedence. Skill scripts also prepend the user
+profile to `PATH`, so a project devenv cannot silently select a CPU build.
 
-Store local Whisper models under `~/.cache/whisper/`. Model downloads can be
-large; obtain confirmation before downloading a multi-gigabyte model.
+## GPU diagnostics
 
-Docling downloads its layout and OCR models on first use. Run the first
-conversion as a background task when appropriate.
+| Symptom | Likely cause | Action |
+| --- | --- | --- |
+| `loaded CPU backend` only | CPU whisper.cpp build won PATH resolution | Run setup; inspect the binary reported by the doctor. |
+| Vulkan library loads but no device appears | `/dev/dri` is hidden or the host driver is unavailable | Rerun with approved host-device access; verify `renderD*`. |
+| GPU exists but transcription silently runs on CPU | Direct `whisper-cli` invocation bypassed the guard | Use `scripts/transcribe.sh`; do not call Whisper directly. |
+| RADV prints a conformance warning | Mesa RADV identifies itself as non-conformant | Treat the positive device/backend marker as GPU evidence; preserve the log. |
+| Docling raises `libxcb.so.1` / `libGL.so` | manylinux wheel cannot see Nix libraries | Run with the user profile `lib` directory in `LD_LIBRARY_PATH`. |
+| `ggml-*.bin` is missing | Model setup was skipped | Run setup; use `--large-model` only when needed. |
+
+## Models
+
+Models live in `${WHISPER_MODEL_DIR:-$HOME/.cache/whisper}`.
+
+- `ggml-small.en-tdrz.bin` (~490 MB) is installed by default for English
+  speaker-turn transcription.
+- `ggml-large-v3.bin` (~3 GB) is downloaded only with `--large-model`.
+
+Downloads use a temporary partial file and rename it only after curl succeeds.
+
+## WhisperX
+
+`setup-tools.sh --with-whisperx` installs WhisperX from nixpkgs. Multi-speaker
+diarization also needs `HF_TOKEN` or `HUGGINGFACE_TOKEN` and accepted access to
+the pyannote diarization models. Do not infer speaker identities from numeric
+labels.
+
+## Non-Nix systems
+
+Automatic installation is Nix-only. On other systems, the setup script exits
+without changes and prints the required capabilities. Metal-capable macOS and
+CUDA-capable Linux builds remain acceptable when the doctor observes a positive
+runtime backend marker.

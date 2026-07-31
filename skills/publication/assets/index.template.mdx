@@ -1,0 +1,53 @@
+---
+title: Working title
+description: One sentence. Becomes the meta description and the card subtitle — write it for someone deciding whether to click, not as a summary of the piece.
+publish_date: YYYY-MM-DD
+published: false
+tags: []
+
+kind: post
+publish_at: null
+canonical: null
+
+syndication: []
+---
+
+{/* Body starts here. Keep these comments while drafting; delete before
+    publish_at. Everything below `tags` is vault-managed metadata. It currently
+    syncs through unchanged; the site schema ignores fields it does not model. */}
+
+{/* OPENING: no throat-clearing, no "in this post we will". State the problem
+    the reader has or the claim you're making, in the first two sentences. If
+    the piece has a demo or a diagram, say what it shows before showing it. */}
+
+{/* MEDIA: files live in ./media/ beside this file, referenced by relative
+    path. Every image and video needs alt text written now — a piece cannot
+    flip to published: true with media that has none.
+
+    Anything whose meaning depends on alignment (ASCII diagrams, aligned
+    tables, code with column structure) must be an IMAGE on surfaces that
+    force a proportional font. Decide that here, not at syndication time. */}
+
+## Section
+
+{/* Body. */}
+
+{/* CLOSING: what the reader should now be able to do, or the sharpest
+    restatement of the claim. Not a recap list. */}
+
+{/* SYNDICATION PLAN — fill the frontmatter list once the canonical is live.
+    Each entry needs a target, a draft path under ./syndication/, its own
+    publish_at, and posted/posted_at left null until it is genuinely live:
+
+    syndication:
+      - target: x-article
+        draft: syndication/x-article.md
+        publish_at: null
+        posted: null
+        posted_at: null
+
+    Write the drafts with the `social-media` skill — it keys templates by
+    artifact shape and carries the per-platform composer references.
+
+    THE GATE: no entry may carry a `posted` value while `canonical` above is
+    null. Your site publishes first, always. */}

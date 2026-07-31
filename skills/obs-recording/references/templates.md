@@ -9,13 +9,16 @@ template is brittle and may expose local identifiers.
 
 ```bash
 SKILL_DIR="${HOME}/.agents/skills/obs-recording"
-cp "${SKILL_DIR}/assets/scenes/screen-camera.json" ./obs-scene.json
-# Edit exact scene/source names and expectations.
+cp "${SKILL_DIR}/assets/scenes/desktop.json" ./obs-scene.json
+# Edit exact scene/source names, dimensions, FPS, and expectations.
 "${SKILL_DIR}/scripts/obsctl.mjs" doctor --manifest ./obs-scene.json
 ```
 
 The doctor compares the manifest with live OBS state. It does not create or
-change scenes, sources, devices, or portal grants.
+change scenes, sources, devices, or portal grants. `desktop.json` and
+`talking-head.json` are 3840×2160 at 60 FPS and use the source names discovered
+on the originating Linux workstation; they MUST be customized when the target
+OBS instance differs.
 
 ## Schema
 

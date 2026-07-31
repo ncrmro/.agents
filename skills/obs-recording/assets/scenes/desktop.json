@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "scene": {
+    "name": "Desktop"
+  },
+  "video": {
+    "baseWidth": 3840,
+    "baseHeight": 2160,
+    "outputWidth": 3840,
+    "outputHeight": 2160,
+    "fps": 60
+  },
+  "sources": [
+    {
+      "name": "Screen Capture (PipeWire)",
+      "role": "screen",
+      "required": true,
+      "visible": true,
+      "kinds": [
+        "pipewire-screen-capture-source"
+      ]
+    }
+  ],
+  "audioInputs": [
+    {
+      "name": "Desktop Audio",
+      "role": "desktop-audio",
+      "required": true,
+      "muted": false,
+      "minGainDb": -60
+    },
+    {
+      "name": "Mic/Aux",
+      "role": "microphone",
+      "required": true,
+      "muted": false,
+      "minGainDb": -60
+    }
+  ],
+  "recording": {
+    "minFreeGiB": 20,
+    "preferredContainers": [
+      "hybrid_mp4",
+      "mkv"
+    ]
+  }
+}

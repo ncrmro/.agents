@@ -1,22 +1,44 @@
 # social-media — design notes
 
-This skill helps a user take **an idea they already have** and present it as an
-X post or a longform X article, tracked as markdown with `scheduled`/`posted`
-frontmatter. See [`SKILL.md`](SKILL.md) for the workflow and frontmatter
-contract; this file records *what good looks like* — the real posts the
-templates are modeled on — so the templates can be judged against live
-examples rather than taste alone.
+This skill helps a user turn an existing idea into a microblog post, longform
+article, short vertical video, story sequence, or carousel. Drafts are Markdown
+files with `scheduled` and `posted` frontmatter. See [`SKILL.md`](SKILL.md) for
+the workflow, [`platforms.md`](platforms.md) for current limits, and this README
+for the examples behind the templates.
+
+## Grounding status
+
+Two templates derive from posts read in full. The remaining three rely on
+documented craft conventions but have no exemplar yet; finding one for each is
+the next pass.
+
+| Template | Grounded in |
+| --- | --- |
+| `template.microblog.md` | exemplars 2 and 3 below, read in full |
+| `template.article.md` | exemplar 1 below, read in full |
+| `template.short-video.md` | **no exemplar yet** — craft conventions + `platforms.md` |
+| `template.story.md` | **no exemplar yet** — craft conventions + `platforms.md` |
+| `template.carousel.md` | **no exemplar yet** — craft conventions + `platforms.md` |
+
+To close a gap: find a Reel/story/carousel that actually worked, watch or read
+it all the way through, and record its structure here the way the three below
+are recorded — beat by beat, structure only, never its text.
+
+Also missing: long-form landscape YouTube (title, thumbnail, chapters,
+description, pinned comment). The user has a YouTube channel, so
+`template.long-video.md` is a real gap, deliberately deferred.
 
 ## The shape we're designing for
 
-A user has a point to make. It lands in one of three forms, by how much room
-the idea needs and whether the longform lives here or elsewhere:
+A user has a point to make. When the point is text, it lands in one of three
+forms, by how much room the idea needs and whether the longform lives here or
+elsewhere:
 
 | Form | Template | When |
 | --- | --- | --- |
-| **Article** | `assets/template.x.article.md` | The idea is a whole course/argument — it earns 1000+ words and stands alone. |
-| **Post → own article** | `assets/template.x.post.md` (thread) | The same idea compressed into a numbered thread that hooks and funnels to the article. |
-| **Post → external longform** | `assets/template.x.post.md` (single) | The longform is someone else's (or a blog); the post is a framed pointer to it. |
+| **Article** | `assets/template.article.md` | The idea is a whole course/argument — it earns 1000+ words and stands alone. |
+| **Post → own article** | `assets/template.microblog.md` (thread) | The same idea compressed into a numbered thread that hooks and funnels to the article. |
+| **Post → external longform** | `assets/template.microblog.md` (single) | The longform is someone else's (or a blog); the post is a framed pointer to it. |
 
 The three reference posts below are one instance of each. All were read in full
 from their live pages; only structure is recorded here, never their text.
@@ -67,3 +89,15 @@ patterns so the templates stay grounded even after the links rot. When a
 template is revised, re-read whichever exemplar it's modeled on (they need a
 logged-in X session) and update this file if the structure it teaches has
 changed.
+
+The source of truth for numeric limits is [`platforms.md`](platforms.md), which
+records a `verified:` date. Templates repeat only the working budgets that shape
+the draft and point back to that file for re-checking.
+
+Composer mechanics decay fastest of all, since they describe someone else's
+web app. They live one file per platform in [`references/`](references/), each
+with its own `verified:` date and an explicit list of what was never exercised.
+Only [`references/x.md`](references/x.md) exists so far, written after loading a
+longform draft into X's Articles composer; its post/thread composer is still
+unexercised. An absent reference file means nobody has driven that editor — not
+that it behaves like X's.

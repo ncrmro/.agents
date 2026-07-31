@@ -1,0 +1,8 @@
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/.devenv/bootstrap/bootstrapLib.nix
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/.devenv/bootstrap/default.nix
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/.devenv/bootstrap/resolve-lock.nix
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/devenv.local.nix
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/devenv.lock
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/devenv.nix
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/devenv.yaml
+/home/ncrmro/repos/ncrmro/.agents/agents/finance/skills/import-finance-pdfs/.env

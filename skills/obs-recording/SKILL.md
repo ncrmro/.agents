@@ -25,22 +25,27 @@ output validation.
    ```
 
 3. If the user has a desired layout, copy a manifest from `assets/scenes/`,
-   customize exact names, then run:
+   customize the exact names, and run the doctor. `desktop.json` and
+   `talking-head.json` match the starter 4K60 Linux workstation layout.
+   Manifests validate intent; they do not create OBS scenes.
 
    ```bash
    "${HOME}/.agents/skills/obs-recording/scripts/obsctl.mjs" \
      doctor --manifest /path/to/scene.json
    ```
 
-4. Resolve findings one layer at a time. Read
+4. When a Hyprland window should match the OBS canvas, read the Hyprland skill's
+   `references/window-formatting.md` and preview its bundled
+   `center-window-for-format.sh`; keep desktop geometry ownership there.
+5. Resolve findings one layer at a time. Read
    [references/diagnostics.md](references/diagnostics.md) for symptom routing.
-5. Before any state change, read
+6. Before any state change, read
    [references/operations.md](references/operations.md) and report the intended
    scene, visible sources, audio mute/fader state, output directory, and free
    space.
-6. Use explicit commands (`start`, `stop`, `pause`, `resume`); never emulate
+7. Use explicit commands (`start`, `stop`, `pause`, `resume`); never emulate
    them with a toggle. Verify the observed state after every write.
-7. After stopping, report the returned path and run
+8. After stopping, report the returned path and run
    `scripts/recording-check.mjs <path>`. Add `--transcribe` when a transcript is
    requested. Transcription delegates to media-editor and classifies Vulkan,
    Metal, or CUDA from runtime-log markers. Successful JSON reports include the
@@ -49,7 +54,7 @@ output validation.
    stderr. Use `--diarize auto|always|never` to choose the policy. Read
    [references/media-validation.md](references/media-validation.md) for
    interpretation and multi-speaker escalation.
-8. Never delete, move, overwrite, normalize, or remux a recording without a
+9. Never delete, move, overwrite, normalize, or remux a recording without a
    separate explicit request.
 
 ## Choose the control path
@@ -84,8 +89,8 @@ output validation.
   silence checks; optional transcription delegates to media-editor and embeds
   backend/device/diarization metadata in the JSON report.
 - `scripts/transcribe-recording.sh` — thin adapter to the shared interface.
-- `assets/scenes/` — copyable operator manifests for screen-only and
-  screen-plus-camera layouts.
+- `assets/scenes/` — copyable operator manifests for desktop, talking-head,
+  screen-only, and screen-plus-camera layouts.
 - `assets/masks/circle-480.png` — reusable centered alpha mask for circular
   camera overlays.
 - `assets/sources/source-template.json` — source expectation snippet.
@@ -98,6 +103,8 @@ output validation.
   audio interpretation and transcription workflow.
 - [references/workflows.md](references/workflows.md) — common agent-operated OBS
   workflows and their local implementation.
+- [references/capture-exclusion.md](references/capture-exclusion.md) — sourced
+  Linux/Wayland limits and reliable ways to keep OBS out of monitor recordings.
 - [references/mcp.md](references/mcp.md) — optional MCP acceptance gate.
 
 If Node lacks a built-in `WebSocket`, stop and use the project's Nix environment
