@@ -31,12 +31,21 @@ conversation. Because the path is absolute, this works from any directory:
 
 ```bash
 outfitter run persona-reviewer -- \
-  --append-system-prompt ~/.agents/personas/platform-lead.md \
+  --append-system-prompt ~/.agents/personas/platform-engineer.md \
   --print "Review the onboarding docs from this persona's point of view."
 ```
 
 The `persona-review` skill wraps the same call and owns the review method,
-evidence gathering, and report shape.
+evidence gathering, and report shape. Its launcher takes a bare role name and
+searches `./docs/personas/`, then `./.agents/personas/`, then this directory —
+so a project persona shadows a cross-project one of the same name:
+
+```bash
+bash scripts/persona-review.sh \
+  --persona platform-engineer \
+  --report reports/platform-engineer-docs.md \
+  -- --print "Review the onboarding docs and write the report. @README.md"
+```
 
 Both skills and the `persona-reviewer` agent resolve from
 `ai-outfitter/community-profiles`, pinned in `settings.yml`.
