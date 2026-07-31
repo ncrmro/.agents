@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# Run one isolated persona review per persona against any project directory.
+#
+# Each persona gets its own finite `outfitter run persona-reviewer` process:
+# separate session, separate report, no shared conversation state.
+set -euo pipefail
+
+agents_home="${AGENTS_HOME:-$HOME/.agents}"
+outfitter_bin="${OUTFITTER_BIN:-outfitter}"
+agent="persona-reviewer"
+target="$PWD"
+report_dir=""
+report_file=""
+# Persona reviews run on luna regardless of the harness default.
+model="${PERSONA_REVIEW_MODEL:-openai-codex/gpt-5.6-luna}"
+capture_session=0
+personas=()
+
+usage() {
+  cat <<'EOF'
+Usage: persona-review --persona <name> [options] <prompt>
+
+Options:
+  --persona <name|file>  Persona to adopt; repeat for one isolated run each.
+                         A bare name resolves against, in order:
+                           <target>/docs/personas/<name>.md
+                           <target>/.agents/personas/<name>.md
+                           ~/.agents/personas/<name>.md
+  --target <dir>         Project to review; the reviewer runs with this as its
+                         working directory (default: current directory).
+  --report <file>        Report path. Only valid with a single --persona.
+  --report-dir <dir>     Directory for reports, one file per persona
+                         (default: ~/.agents/local/persona-reviews/<target>/).
+  --session              Also save the Pi session as .session.jsonl and .html
+                         sidecars beside each report.
+  --model <model>        Model for the reviewer
+                         (default: openai-codex/gpt-5.6-luna).
+  --agent <slug>         Reviewing agent (default: persona-reviewer).
+
+The prompt is passed to a finite --print run. Reference files in the target
+project with @path, e.g. 'Review the onboarding docs. @README.md'.
+EOF
+}
+
+resolve_persona() {
+  local name="${1%.md}" candidate
+  for candidate in \
+    "$target/docs/personas/$name.md" \
+    "$target/.agents/personas/$name.md" \
+    "$agents_home/personas/$name.md"; do
+    if [[ -f "$candidate" && -r "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  {
+    echo "persona-review: no persona named '$1' in:"
+    printf '  %s\n' \
+      "$target/docs/personas/$name.md" \
+      "$target/.agents/personas/$name.md" \
+      "$agents_home/personas/$name.md"
+  } >&2
+  return 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --persona)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "persona-review: --persona requires a value" >&2; exit 2; }
+      personas+=("$2")
+      shift 2
+      ;;
+    --target)
+      [[ $# -ge 2 && -d "$2" ]] || { echo "persona-review: --target must be an existing directory" >&2; exit 2; }
+      target="$(cd -- "$2" && pwd -P)"
+      shift 2
+      ;;
+    --report)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "persona-review: --report requires a path" >&2; exit 2; }
+      report_file="$2"
+      shift 2
+      ;;
+    --report-dir)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "persona-review: --report-dir requires a path" >&2; exit 2; }
+      report_dir="$2"
+      shift 2
+      ;;
+    --session) capture_session=1; shift ;;
+    --model)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "persona-review: --model requires a value" >&2; exit 2; }
+      model="$2"
+      shift 2
+      ;;
+    --agent)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "persona-review: --agent requires a slug" >&2; exit 2; }
+      agent="$2"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    -*) echo "persona-review: unknown option '$1'" >&2; usage >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
+
+[[ ${#personas[@]} -gt 0 ]] || { echo "persona-review: at least one --persona is required" >&2; usage >&2; exit 2; }
+[[ $# -eq 1 && -n "$1" ]] || { echo "persona-review: exactly one prompt argument is required" >&2; usage >&2; exit 2; }
+prompt="$1"
+[[ -z "$report_file" || ${#personas[@]} -eq 1 ]] || {
+  echo "persona-review: --report needs a single --persona; use --report-dir for several" >&2
+  exit 2
+}
+command -v "$outfitter_bin" >/dev/null 2>&1 || {
+  echo "persona-review: '$outfitter_bin' is not on PATH" >&2
+  exit 127
+}
+
+[[ -n "$report_dir" ]] || report_dir="$agents_home/local/persona-reviews/$(basename "$target")"
+
+# Resolve every persona before running anything, so a typo fails fast.
+persona_files=()
+for name in "${personas[@]}"; do
+  if [[ "$name" == */* || -f "$name" ]]; then
+    [[ -f "$name" && -r "$name" ]] || { echo "persona-review: not a readable persona file: $name" >&2; exit 1; }
+    persona_files+=("$(cd -- "$(dirname -- "$name")" && pwd -P)/$(basename -- "$name")")
+  else
+    persona_files+=("$(resolve_persona "$name")")
+  fi
+done
+
+run_one() {
+  local persona_file="$1" report="$2" slug status=0
+  slug="$(basename "$persona_file" .md)"
+  local report_parent session_dir session_out session_file
+  report_parent="$(dirname "$report")"
+  mkdir -p "$report_parent"
+
+  local args=(run "$agent" --)
+  [[ -z "$model" ]] || args+=(--model "$model")
+  args+=(--append-system-prompt "$persona_file")
+
+  session_dir=""
+  if [[ "$capture_session" -eq 1 ]]; then
+    session_out="${report%.md}.session.jsonl"
+    session_dir="$report_parent/.$slug.session-tmp.$$"
+    mkdir -p "$session_dir"
+    args+=(--session-dir "$session_dir" --name "$slug")
+  fi
+  args+=(--print "$prompt")
+
+  local report_tmp
+  report_tmp="$(mktemp "${report}.tmp.XXXXXX")"
+  ( cd "$target" && "$outfitter_bin" "${args[@]}" ) >"$report_tmp" || status=$?
+
+  if [[ "$status" -ne 0 ]]; then
+    rm -f "$report_tmp"
+    [[ -z "$session_dir" ]] || echo "persona-review: partial session kept at $session_dir" >&2
+    echo "persona-review: $slug review failed with status $status" >&2
+    return "$status"
+  fi
+  if [[ ! -s "$report_tmp" ]]; then
+    rm -f "$report_tmp"
+    echo "persona-review: $slug produced an empty report" >&2
+    return 1
+  fi
+  mv -f "$report_tmp" "$report"
+  printf 'persona-review: report saved to %s\n' "$report" >&2
+
+  if [[ -n "$session_dir" ]]; then
+    session_file="$(find "$session_dir" -maxdepth 1 -type f -name '*.jsonl' -print -quit)"
+    if [[ -z "$session_file" ]]; then
+      echo "persona-review: no session file in $session_dir" >&2
+      return 1
+    fi
+    mv -f "$session_file" "$session_out"
+    rmdir "$session_dir" 2>/dev/null || true
+    printf 'persona-review: session saved to %s\n' "$session_out" >&2
+    if ( cd "$target" && "$outfitter_bin" run "$agent" -- --export "$session_out" "${session_out%.jsonl}.html" ) >&2; then
+      printf 'persona-review: session HTML saved to %s\n' "${session_out%.jsonl}.html" >&2
+    else
+      echo "persona-review: session HTML export failed" >&2
+      return 1
+    fi
+  fi
+}
+
+failed=()
+for persona_file in "${persona_files[@]}"; do
+  slug="$(basename "$persona_file" .md)"
+  if [[ -n "$report_file" ]]; then
+    report="$report_file"
+  else
+    report="$report_dir/$slug.md"
+  fi
+  printf 'persona-review: %s reviewing %s\n' "$slug" "$target" >&2
+  run_one "$persona_file" "$report" || failed+=("$slug")
+done
+
+if [[ ${#failed[@]} -gt 0 ]]; then
+  printf 'persona-review: failed reviews: %s\n' "${failed[*]}" >&2
+  exit 1
+fi
