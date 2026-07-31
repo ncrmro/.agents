@@ -146,7 +146,13 @@ run_one() {
     mkdir -p "$session_dir"
     args+=(--session-dir "$session_dir" --name "$slug")
   fi
-  args+=(--print "$prompt")
+  # The launcher owns the report file. A reviewer that writes its own would be
+  # clobbered by the captured stdout, so forbid it explicitly.
+  args+=(--print "$prompt
+
+Return the complete report as your final message. This launcher captures your
+standard output and saves it as the report, so do not create, write, or edit
+any file — a report you write yourself will be overwritten and lost.")
 
   local report_tmp
   report_tmp="$(mktemp "${report}.tmp.XXXXXX")"
@@ -162,6 +168,11 @@ run_one() {
     rm -f "$report_tmp"
     echo "persona-review: $slug produced an empty report" >&2
     return 1
+  fi
+  # A few hundred characters is a pointer to a file, not a review.
+  if [[ "$(wc -c <"$report_tmp")" -lt 400 ]]; then
+    echo "persona-review: warning: $slug returned only $(wc -c <"$report_tmp") bytes;" >&2
+    echo "  it may have written the report to a file instead. Check the session log." >&2
   fi
   mv -f "$report_tmp" "$report"
   printf 'persona-review: report saved to %s\n' "$report" >&2
