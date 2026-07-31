@@ -23,3 +23,7 @@ default_harness: pi
 sources:
   - github: ai-outfitter/default-profiles
     ref: v1.0.0
+  # Supplies the persona-authoring/persona-review skills and the shared
+  # persona-reviewer agent they launch.
+  - github: ai-outfitter/community-profiles
+    ref: v1.1.0

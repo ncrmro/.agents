@@ -44,6 +44,10 @@ The `profiles/` files and legacy keys in `settings.yml` are a frozen compatibili
 
 - `agents/` — native v1 identities and their loadouts.
 - `skills/` — native v1 skills.
+- `personas/` — cross-project persona documents, appended to a reviewer at
+  launch (see `personas/README.md`). Not a resource type Outfitter resolves;
+  plain Markdown referenced by absolute path, so it works from any directory.
+  Project-specific personas stay in that project's `docs/personas/`.
 - `settings.yml` — v1 defaults and published source graph.
 - `settings.local.yml` — ignored machine-local source overrides.
 - `profiles/` — frozen pre-v1 snapshot (see Migration compatibility).
