@@ -64,6 +64,7 @@ done
 [ -n "$output" ] && [ -n "$payload" ] && [ -n "$config" ] && [ -n "$url" ]
 cp "$payload" "$TEST_LOG/request.json"
 printf '%s\n' "$url" >"$TEST_LOG/url.txt"
+cp "$config" "$TEST_LOG/curl.conf"
 cp "$TEST_AUDIO" "$output"
 EOF
 
@@ -119,6 +120,24 @@ grep -F '/v1/text-to-speech/voice123?output_format=mp3_44100_128' \
 if grep -F "$test_key" "$TMP/log/curl.args" >/dev/null; then
   fail "ElevenLabs API key appears in curl arguments."
 fi
+grep -F "xi-api-key: $test_key" "$TMP/log/curl.conf" >/dev/null ||
+  fail "ElevenLabs API key is missing from the curl configuration."
+
+key_file=$TMP/elevenlabs-api-key
+file_test_key=file_test_key
+printf '%s\n' "$file_test_key" >"$key_file"
+env -u ELEVENLABS_API_KEY PATH="$TMP/bin:$PATH" "$RENDER" \
+  --provider elevenlabs \
+  --script "$TMP/narration.txt" \
+  --output "$TMP/elevenlabs-key-file.wav" \
+  --api-key-file "$key_file" \
+  --voice-id voice123 \
+  --confirm-external >/dev/null
+grep -F "xi-api-key: $file_test_key" "$TMP/log/curl.conf" >/dev/null ||
+  fail "ElevenLabs API key file was not used."
+if grep -F "$file_test_key" "$TMP/log/curl.args" >/dev/null; then
+  fail "ElevenLabs API key from the file appears in curl arguments."
+fi
 
 if ELEVENLABS_API_KEY=$test_key PATH="$TMP/bin:$PATH" "$RENDER" \
   --provider elevenlabs \
@@ -134,11 +153,13 @@ if env -u ELEVENLABS_API_KEY PATH="$TMP/bin:$PATH" "$RENDER" \
   --provider elevenlabs \
   --script "$TMP/narration.txt" \
   --output "$TMP/no-key.wav" \
+  --api-key-file "$TMP/missing-key" \
   --voice-id voice123 \
   --confirm-external >"$TMP/no-key.out" 2>"$TMP/no-key.err"; then
-  fail "ElevenLabs request ran without ELEVENLABS_API_KEY."
+  fail "ElevenLabs request ran without an API key."
 fi
-grep -F 'ELEVENLABS_API_KEY is required' "$TMP/no-key.err" >/dev/null ||
-  fail "Missing ElevenLabs key did not explain the required variable."
+grep -F 'Set ELEVENLABS_API_KEY or provide a readable API key file' \
+  "$TMP/no-key.err" >/dev/null ||
+  fail "Missing ElevenLabs key did not explain the required sources."
 
 printf '%s\n' 'video-director narration providers: ok'

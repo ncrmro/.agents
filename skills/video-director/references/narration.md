@@ -49,10 +49,12 @@ the pause between script lines.
 
 ## ElevenLabs
 
-ElevenLabs is an external paid service. Load the API key from an approved
-secret store into `ELEVENLABS_API_KEY`. Do not type the key as a command
-argument. Set `ELEVENLABS_VOICE_ID`, or pass the non-secret voice ID with
-`--voice-id`.
+ElevenLabs is an external paid service. On a configured Keystone host, the
+helper reads `/run/secrets/elevenlabs-api-key`. The runtime secret file MUST be
+readable by the current user. For another host, set `ELEVENLABS_API_KEY_FILE`
+or use `--api-key-file`. `ELEVENLABS_API_KEY` takes precedence when it is set.
+Do not type the key as a command argument. Set `ELEVENLABS_VOICE_ID`, or pass
+the non-secret voice ID with `--voice-id`.
 
 Get user approval for the request. Then run:
 

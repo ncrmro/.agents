@@ -27,6 +27,7 @@ Piper options:
   --segment-pause SECONDS  Pause between script lines. Default: 0.28.
 
 ElevenLabs options:
+  --api-key-file FILE      API key file. Default: /run/secrets/elevenlabs-api-key.
   --voice-id ID            Voice ID. ELEVENLABS_VOICE_ID also works.
   --model-id ID            Model ID. Default: eleven_multilingual_v2.
   --output-format FORMAT   API output format. Default: mp3_44100_128.
@@ -35,7 +36,8 @@ ElevenLabs options:
   --zero-retention         Request zero retention. Enterprise support required.
   --confirm-external       Confirm user approval for the paid service request.
 
-The ElevenLabs API key must be in ELEVENLABS_API_KEY.
+ELEVENLABS_API_KEY takes precedence over --api-key-file and
+ELEVENLABS_API_KEY_FILE.
 EOF
 }
 
@@ -55,6 +57,8 @@ piper_config=${PIPER_CONFIG:-}
 segment_pause=0.28
 
 elevenlabs_voice_id=${ELEVENLABS_VOICE_ID:-}
+elevenlabs_api_key_file=${ELEVENLABS_API_KEY_FILE:-/run/secrets/elevenlabs-api-key}
+elevenlabs_api_key=
 elevenlabs_model_id=${ELEVENLABS_MODEL_ID:-eleven_multilingual_v2}
 elevenlabs_output_format=${ELEVENLABS_OUTPUT_FORMAT:-mp3_44100_128}
 language_code=
@@ -106,6 +110,11 @@ while [ $# -gt 0 ]; do
     --voice-id)
       [ $# -ge 2 ] || fail "--voice-id needs a value."
       elevenlabs_voice_id=$2
+      shift 2
+      ;;
+    --api-key-file)
+      [ $# -ge 2 ] || fail "--api-key-file needs a value."
+      elevenlabs_api_key_file=$2
       shift 2
       ;;
     --model-id)
@@ -201,10 +210,14 @@ case "$provider" in
       "brew install jq"
     [ "$confirm_external" = true ] ||
       fail "ElevenLabs can use credits and receives the script. Get user approval, then add --confirm-external."
-    [ -n "${ELEVENLABS_API_KEY:-}" ] ||
-      fail "ELEVENLABS_API_KEY is required for the ElevenLabs provider."
-    [[ "$ELEVENLABS_API_KEY" =~ ^[A-Za-z0-9._-]+$ ]] ||
-      fail "ELEVENLABS_API_KEY contains an unsupported character."
+    elevenlabs_api_key=${ELEVENLABS_API_KEY:-}
+    if [ -z "$elevenlabs_api_key" ] && [ -r "$elevenlabs_api_key_file" ]; then
+      elevenlabs_api_key=$(<"$elevenlabs_api_key_file")
+    fi
+    [ -n "$elevenlabs_api_key" ] ||
+      fail "Set ELEVENLABS_API_KEY or provide a readable API key file: $elevenlabs_api_key_file"
+    [[ "$elevenlabs_api_key" =~ ^[A-Za-z0-9._-]+$ ]] ||
+      fail "The ElevenLabs API key contains an unsupported character."
     [ -n "$elevenlabs_voice_id" ] ||
       fail "--voice-id or ELEVENLABS_VOICE_ID is required."
     [[ "$elevenlabs_voice_id" =~ ^[A-Za-z0-9_-]+$ ]] ||
@@ -297,7 +310,7 @@ render_elevenlabs() {
       + (if $seed == null then {} else {seed: $seed} end)
     ' >"$request_file"
 
-  printf 'header = "xi-api-key: %s"\n' "$ELEVENLABS_API_KEY" >"$curl_config"
+  printf 'header = "xi-api-key: %s"\n' "$elevenlabs_api_key" >"$curl_config"
   chmod 600 "$curl_config"
 
   local endpoint
