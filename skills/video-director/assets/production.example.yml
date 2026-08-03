@@ -1,0 +1,85 @@
+version: 1
+title: Deploy and verify
+claim: A command deploys the application, and the browser shows the new version.
+audience: Software developers
+
+output:
+  width: 1920
+  height: 1080
+  frames_per_second: 60
+  target_seconds: 75
+  container: mp4
+
+safety:
+  external_writes:
+    - The deployment updates the approved demo environment.
+  secrets: prohibited
+  browser_profile: isolated
+  desktop_workspace: dedicated
+
+narration:
+  provider: piper
+  script: raw/narration.txt
+  voice_id: approved-local-voice
+  model_id: piper-voice-model
+  native_artifact: derived/narration.piper.wav
+  output: derived/narration.wav
+  external_request: false
+  approval: not-required
+
+scenes:
+  - id: deploy-and-verify
+    purpose: Show the deployment command and the browser result together.
+    layout:
+      type: split-screen
+      slots:
+        left: cli
+        right: app
+
+    sources:
+      - id: cli
+        type: terminal
+        driver: shell
+        recorder: asciinema
+        artifact: raw/deploy-and-verify.cast
+        start_state: The shell is in a disposable worktree with the demo revision.
+        end_state: The command reports a successful deployment.
+
+      - id: app
+        type: browser
+        driver: chrome-devtools
+        recorder: obs
+        artifact: raw/deploy-and-verify-browser.mkv
+        start_state: The isolated browser shows the current demo version.
+        end_state: The browser shows the deployed version.
+
+    actions:
+      - id: run-deploy
+        source: cli
+        do: Run the approved deployment script.
+        expect: The command reports a successful deployment.
+        side_effect: The approved demo environment receives the new revision.
+
+      - id: refresh-app
+        source: app
+        do: Reload the application page.
+        expect: The page shows the deployed revision.
+
+    sync:
+      method: controller-event-log
+      marker: deploy-and-verify-start
+      tolerance_milliseconds: 250
+
+    artifacts:
+      - raw/deploy-and-verify.cast
+      - raw/deploy-and-verify-browser.mkv
+
+deliverables:
+  - production.yml
+  - events.ndjson
+  - raw/narration.txt
+  - derived/narration.piper.wav
+  - derived/narration.wav
+  - edit-plan.md
+  - output/demo.mp4
+  - output/demo.srt
