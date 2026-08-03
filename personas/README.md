@@ -13,6 +13,12 @@ Filenames are lowercase and hyphenated, and name the role rather than the
 person — `platform-lead.md`, not `dana.md`. Add a named individual only when a
 specific person's voice is the point.
 
+Keep the name short and match it to the same role elsewhere. The launcher
+resolves a bare name across all three directories, so `engineer.md` here and
+`engineer.md` in a project are the same role and shadow correctly, while
+`software-engineer.md` here against `engineer.md` there would silently resolve
+to different documents depending on the working directory.
+
 ## Authoring
 
 Use the `persona-authoring` skill rather than writing from scratch; it owns the
