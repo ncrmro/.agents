@@ -26,4 +26,4 @@ sources:
   # Supplies the persona-authoring/persona-review skills and the shared
   # persona-reviewer agent they launch.
   - github: ai-outfitter/community-profiles
-    ref: v1.1.1
+    ref: v1.2.0
