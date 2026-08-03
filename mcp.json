@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "grafana": {
+      "type": "sse",
+      "url": "https://mcp-grafana.ncrmro.com/sse"
+    },
     "playwright": {
       "type": "stdio",
       "command": "mcp-server-playwright",
