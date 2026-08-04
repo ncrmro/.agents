@@ -22,8 +22,24 @@ keeps the publication record unambiguous. The order is not a preference; it is
 the reason the pipeline exists.
 
 This is a hard gate. While `canonical:` is null, every `syndication[].posted`
-stays null. A publisher job must refuse to act on a syndication target whose
-canonical is unset, and an agent must refuse to record one.
+stays null. An agent must refuse to record a syndication `posted` whose
+canonical is unset.
+
+**Missing is not the same as null.** A piece that predates this pipeline — or
+was imported from the site rather than drafted here — often has `published: true`
+and no `canonical:` key at all, while the post has been live for months. The gate
+is about *the canonical not existing*, not about the field being unfilled, so
+treat an absent key as unverified rather than as a refusal:
+
+1. Derive the URL from the slug (`/posts/<slug>/`, date prefix stripped).
+2. `curl -s -o /dev/null -w "%{http_code}"` it. A 200 means the canonical
+   shipped; the record was just never written.
+3. Write it into `canonical:` and continue. Anything other than 200 means the
+   piece genuinely is not live — then the gate is real and stands.
+
+Backfilling a verified URL is not the same as inventing one, and it is the fix
+whenever the gate blocks a piece that is demonstrably published. Never skip
+step 2: an assumed URL in `canonical:` corrupts the record the gate protects.
 
 ## Where publications live
 
@@ -134,7 +150,7 @@ already under `code/web/public/posts/` predates this and stays in Git LFS.
 title: Projected git graph planning
 description: One sentence. Becomes the meta description and the card subtitle.
 publish_date: 2026-08-02        # the date displayed on the piece
-published: false                # flipped true by the publisher at publish_at
+published: false                # flipped true when the piece goes live
 tags: [git, agents]
 
 # --- vault-side: synced through as-is; the site schema ignores what it
@@ -144,18 +160,27 @@ publish_at: 2026-08-02T09:00:00-05:00   # when to go live; null = unscheduled
 canonical: null                 # the live URL. The gate for everything below.
 
 syndication:
-  - target: x-article
-    draft: syndication/x-article.md
-    publish_at: 2026-08-02T15:00:00-05:00
-    posted: null                # the live URL once posted
-    posted_at: null             # ISO timestamp of posting
-  - target: linkedin-post
-    draft: syndication/linkedin-post.md
-    publish_at: null
+  - platform: x                  # the destination network
+    kind: article                # the artifact shape, per the social-media skill
+    draft: syndication/2026-08-02-x-article.md
+    scheduled: null              # when it should go out; null = unplanned
+    posted: null                 # the live URL once posted
+    posted_at: null              # ISO timestamp of posting, local offset
+  - platform: linkedin
+    kind: post
+    draft: syndication/2026-08-02-linkedin-post.md
+    scheduled: null
     posted: null
     posted_at: null
 ---
 ```
+
+`platform` + `kind` rather than one composite `target`, and `scheduled` rather
+than `publish_at`, so a syndication entry matches the `social-media` draft it
+points at — that skill's frontmatter uses the same three names, and the two
+files describing one post should not disagree about what to call things.
+`publish_at` stays reserved for the canonical, where it triggers the site
+publish; a syndication entry never carries it.
 
 Three fields carry three different meanings, and conflating them is the common
 mistake:
@@ -163,8 +188,8 @@ mistake:
 | field | means |
 | --- | --- |
 | `publish_date` | the date shown to a reader — display only |
-| `publish_at` | when the publisher should act — the scheduling trigger |
-| `published` | whether it is live — state, flipped by the publisher |
+| `publish_at` | when the piece should go live — the scheduling intent |
+| `published` | whether it is live — state, flipped when it ships |
 
 The lifecycle is readable from the file alone. `publish_at: null` is an idea;
 a future `publish_at` with `published: false` is queued; a past `publish_at`
@@ -207,10 +232,24 @@ that's a change in the site repo, not here.
    cannot be reliably automated.
 5. **Syndicate** — write each version with the `social-media` skill (its
    templates are keyed by artifact shape, and its per-platform references cover
-   the composers), store them under `syndication/`, and give each a
-   `publish_at`.
+   the composers), store them under `syndication/`, and give each a `scheduled`.
+   Load the composer, verify it, and stop at the button: the user posts.
 6. **Record** — when a target goes live, set its `posted` to the real URL and
-   `posted_at` to the timestamp. Never invent either.
+   `posted_at` to the timestamp. Never invent either — read both off the live
+   page after posting, not off the composer you just drove. A composer's own DOM
+   will report success over a document the platform saved differently, and an ID
+   you construct rather than fetch is a guess.
+
+   Writing back into `index.mdx` has its own discipline, because a human edits
+   the same file:
+
+   - Re-read the file immediately before writing; never write from a copy read
+     earlier in the session.
+   - Touch only the fields you own — `published`, `canonical`, and each entry's
+     `posted` / `posted_at`. Don't reflow the body, reorder keys, or rewrite what
+     a human set.
+   - This vault auto-commits and pushes every few minutes. On conflict, stop and
+     surface it rather than forcing.
 
 ## Choosing targets
 
@@ -227,17 +266,6 @@ whether a copy competes with your canonical in search:
 Check whether the target lets you set `rel=canonical`. Where it doesn't, prefer
 an excerpt with a link and an "originally published at" credit.
 
-## Automation
-
-A publisher job can run this on a schedule. Its selection rules:
-
-- **Canonical:** `publish_at <= now AND published == false` → flip, sync, deploy.
-- **Syndication:** `canonical != null AND entry.publish_at <= now AND
-  entry.posted == null` → post it, then write back `posted` and `posted_at`.
-
-`references/automation.md` has the full job spec, the required safeguards, and
-the writeback protocol. Read it before building or changing the runner.
-
 ## Boundaries
 
 - **The canonical gate is not advisory.** Never record a syndication `posted`
@@ -248,7 +276,7 @@ the writeback protocol. Read it before building or changing the runner.
 - Media that carries meaning needs alt text before `published` flips, not after.
 - Deleting or rewriting a published piece changes a URL other people may link
   to. Prefer an addendum; if it must change, keep the slug.
-- An automated publisher acts on the user's behalf under their identity. It
-  requires their explicit standing authorization, honours the kill switch
-  immediately, and stops on the first error rather than continuing down the
-  list.
+- **The user publishes.** Prepare the piece, verify it, and stop at the button.
+  Posting under someone's identity is theirs to trigger, per target, per
+  session — an approval to publish the canonical is not an approval to
+  syndicate, and yesterday's yes does not carry to today.

@@ -108,18 +108,32 @@ newlines, so a pasted ASCII diagram looks nearly right while its alignment is
 destroyed. A surface that can't render the artifact changes the draft — the
 diagram becomes a planned image with alt text, in the outline, from the start.
 
+Check the surface's capabilities each time rather than trusting the last
+answer — these editors gain block types, and a draft written against a stale
+assumption specifies screenshots for things that should be native blocks. When
+the surface does have a block that holds the content, use it: **copyable beats
+pretty**, and an image nobody can select is a downgrade whenever the content is
+text someone would paste.
+
 ## Workflow
 
 1. **Draft** — pick the template from the table above, copy it into the posts
    directory and fill it in. The templates carry the hook-first structure; keep
    their section comments while drafting, delete them before scheduling.
-2. **Review** — run the `prose-reviewer` skill on the draft before it's
+2. **Render the stills** — produce every image the draft plans: code and diagram
+   cards, covers, carousel slides. `references/rendering-images.md` has the
+   headless-Chromium method and the house look. Do this as part of drafting, not
+   at publish time; a `<!-- IMAGE -->` note left in a finished draft is what
+   blocks it weeks later. Then replace the note with the real filename,
+   dimensions, and alt text. (Video and photography are a handoff, below — this
+   step is stills you can render.)
+3. **Review** — run the `prose-reviewer` skill on the draft before it's
    queued, including captions and on-screen text. Social copy is the most
    outward-facing prose there is, and AI tells in a post get called out
    publicly.
-3. **Schedule** — set `scheduled`. Convert relative asks ("tomorrow morning")
+4. **Schedule** — set `scheduled`. Convert relative asks ("tomorrow morning")
    to absolute ISO 8601 with the local offset.
-4. **Publish** — the user posts it themselves; publishing is never done by this
+5. **Publish** — the user posts it themselves; publishing is never done by this
    skill. After they post, set `posted` to the live URL. If asked to help
    publish, the most this skill does is load the draft into the compose page and
    leave the user to submit.
@@ -151,9 +165,12 @@ nowhere.
 
 ## Media handoff
 
-This skill produces the **brief**, never the media. The short-video, story and
-carousel templates specify what to shoot, what the beats are, and what the edit
-must preserve. Production belongs to the skills that already do it:
+This skill renders its own **stills** — code cards, diagram cards, covers,
+carousel slides — per `references/rendering-images.md`. Anything that must be
+*shot* or *cut* is a brief, never media this skill makes: photography, screen
+capture, and video. The short-video, story and carousel templates specify what to
+shoot, what the beats are, and what the edit must preserve. Production belongs to
+the skills that already do it:
 
 - `obs-recording` — capture.
 - `media-editor` — transcription, transcript-driven cuts, subtitles, export.
@@ -177,11 +194,10 @@ Don't introduce new video or image tooling here.
   that is days old.
 - Alt text is required on every image and carousel slide before scheduling, and
   burned-in subtitles on every short video. Not optional, not a follow-up task.
-- Don't post on the user's behalf by default — load the composer and let them
-  submit. The exception is a project with an explicit automated publisher the
-  user has authorized: see the `publication` skill and its
-  `references/automation.md` for the preconditions that make that safe
-  (canonical gate, kill switch, idempotency, verify-after-posting). Absent that
-  standing authorization, the user submits.
+- Don't post on the user's behalf — load the composer, verify it, and stop at
+  the button. The only exception is an explicit go-ahead from the user in this
+  session, for this piece; act on that and nothing looser. Approval to publish
+  one target is not approval for the next, and an earlier session's yes does not
+  carry over. After posting, read the real URL and timestamp off the live page.
 - One piece of content per file; a thread is one file, a carousel is one file, a
   story sequence is one file.
