@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slidev Presentation"
+  short_description: "Build clear, verified Slidev slide decks"
+  default_prompt: "Use $slidev-presentation to build a clear Slidev deck from my source material."
