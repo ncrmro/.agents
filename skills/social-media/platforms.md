@@ -9,8 +9,9 @@ renders, how to load a draft, what breaks — see the per-platform reference:
 
 | Platform | Reference |
 | --- | --- |
-| X | [`references/x.md`](references/x.md) — articles verified; post/thread composer unverified |
-| Instagram, TikTok, YouTube, LinkedIn, Bluesky, Threads, Mastodon | none yet |
+| X — articles | [`references/x.md`](references/x.md) — verified |
+| X, Bluesky, Threads, Mastodon, LinkedIn — posts and threads | [`references/microblog-composers.md`](references/microblog-composers.md) — **none verified yet** |
+| Instagram, TikTok, YouTube | none yet |
 
 Write one the first time you publish to a new surface. An absent file means
 nobody has exercised that composer, not that it behaves like X's.
@@ -66,6 +67,42 @@ syndicating something you published elsewhere first.
 if X is in the set, 300 if it is Bluesky-and-up. Do not paste X thread numbering
 into a single-post channel, and do not leave "link in bio" phrasing on platforms
 where links are clickable.
+
+### Hashtags
+
+**Not verified against platform documentation.** These are working conventions,
+and the *cultural* rows below are softer than the *mechanical* ones. The
+mechanical rows are the ones that change what you write.
+
+| Platform | Working norm | Why |
+| --- | --- | --- |
+| X | **0–1** | X's own communication has said tags are no longer needed for reach; piles read as spam |
+| Bluesky | **1–3** | tags are real facets and feed into custom feeds, so they do discovery work |
+| Threads | **1** — mechanical | the tag system takes a single topic tag per post; a second is not a style choice, it is unavailable |
+| Mastodon | **2–5** — mechanical | there is no ranking algorithm at all, so tags and follows are the *only* discovery surface. A Mastodon post with no tag reaches your followers and nobody else |
+| LinkedIn | **3–5** | conventional; effect on reach disputed like everything else on LinkedIn |
+
+**Write multi-word Mastodon tags in CamelCase** — `#SpaceAgriculture`, not
+`#spaceagriculture`. Screen readers pronounce a CamelCase tag as words and a
+lowercase one as a single unintelligible run. This is an established
+accessibility norm in the fediverse, not a preference, and it is noticed.
+
+The asymmetry matters when adapting: the same post wants **zero** tags on X and
+**several** on Mastodon. Hashtags are the one element you should expect to differ
+most between variants, not least.
+
+### Cadence
+
+No best-time claims here — they are unmeasurable from this side and every
+aggregator disagrees. Two things are worth writing down:
+
+- **Stagger a multi-channel push across days, not minutes**, when the same link
+  is going to every channel. Simultaneous identical-link posts across five
+  accounts is a spam-shaped pattern, most visibly on LinkedIn and Threads.
+- **A brand-new account is the fragile case.** Accounts with no posting history,
+  no avatar and no bio are the ones platforms scrutinise. Finish the profiles
+  first, then post; and do not make the first post from a new account a link-out
+  to the same URL as four other new accounts on the same morning.
 
 ## Short vertical video — `template.short-video.md`
 

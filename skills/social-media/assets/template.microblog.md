@@ -24,12 +24,9 @@ posted: null
 
 <!-- 2/ -->
 
-<!-- MULTI-CHANNEL: to send one draft to several channels, replace the flat
-     `platform:` line with a `channels:` list (see SKILL.md) and note here
-     what changes per channel. Reuse the claim; rewrite the hook, the CTA and
-     anything platform-specific. Never paste `1/` numbering into a channel
-     that posts as a single block, and strip "link in bio" phrasing where
-     links are clickable. -->
+<!-- MULTI-CHANNEL: this template is for ONE destination. For several, start
+     over from template.microblog.multi.md, which carries a `channels:` list
+     and a finished variant per channel. Don't retrofit this file. -->
 
 <!-- MEDIA: note any image/video to attach, WITH its alt text — alt text is
      required before scheduling, not optional. The user adds both when
