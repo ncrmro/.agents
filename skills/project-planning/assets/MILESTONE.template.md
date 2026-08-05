@@ -9,7 +9,8 @@
 | --- | --- |
 | **ID** | M<n> (`N` while draft/RFC; a number once tracked) |
 | **Status** | Draft \| Active \| Shipped |
-| **Flag** | `<feature_flag_name>` — off by default on main |
+| **Stage** | `<stage>` (Explore, Ship, Manage, or Program); record the reason when it overrides the project default |
+| **Flag or gate** | `<feature_flag_name>` — off by default on main \| `<containment, reversibility, or verification gate>` |
 | **Persona** | [<Role — Org>](../../personas/<slug>.md) |
 | **Report** | [<YYYY-MM-QN plan>](../../reports/<file>.md) |
 
@@ -21,13 +22,33 @@
 If you cannot source this quote from a real reaction after the demo, mark it
 `ASPIRATIONAL` and treat that as a scope warning, not a copywriting problem.
 
-## What it scopes
+## Scope and commitment
+
+**Primary outcome or uncertainty:** <the one result this milestone exists to
+produce>
+
+For an experimental milestone:
+
+- **Independent variable axis:** <the one thing that changes>
+- **Fixed controls:** <apparatus, protocol, environment, measurements, and
+  analysis that do not change>
+
+### Core — gates milestone closure
 
 Requirements this milestone satisfies (it does not invent obligations — it
 selects them):
 
 - `<PREFIX>-NNN.M` — <one line on what closing it means here>
 - `<PREFIX>-NNN.M` — <…>
+
+### Stretch — assigned, non-gating
+
+- <work on the same outcome or variable axis that can use spare
+  capacity without delaying core>
+
+Assign current stretch issues to the forge milestone and mark them as stretch.
+They do not gate closure. When the core demo passes, close the milestone and
+move unfinished stretch to `next` or `later`.
 
 Explicitly **out** of scope, and why:
 

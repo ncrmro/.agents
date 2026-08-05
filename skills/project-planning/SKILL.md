@@ -1,6 +1,6 @@
 ---
 name: project-planning
-description: Plan and track work as a projected git graph — the future git log drawn in ASCII or mermaid gitGraph, with stacked PRs, milestones, and release-please releases on top. Use when planning or iterating new work or to quickly get the state of one or more projects.
+description: Plan, track, scope, prioritize, and govern work as a projected git graph. Use when planning work, reporting project state, extending work beyond the next day, or changing milestone scope.
 ---
 
 # Project planning
@@ -19,6 +19,10 @@ gitGraph where markdown renders.
 
 Supporting material, read on demand:
 
+- `references/governance.md` — project/workstream stages, graduation triggers,
+  core/stretch/next decisions, experimental variable control, and the review
+  loop. Read it when work extends beyond the next day. Also read it when you
+  add, split, shrink, close, or reprioritize a milestone.
 - `references/ascii.md` — ASCII templates: release column, stacked PRs,
   parallel lanes, milestones, multi-release roadmaps, drawing rules.
 - `references/mermaid.md` — the same scenarios as mermaid gitGraph, plus
@@ -28,6 +32,55 @@ Supporting material, read on demand:
   Run from the repo root, or pass `owner/repo` / forge URLs (several at once
   for multi-repo projects); `--help` covers targets, the section → glyph
   mapping, and gh/tea forge support.
+
+## The scope trap
+
+**A milestone sets a falsifiable boundary around one outcome or primary
+uncertainty.** Define the smallest core whose demo meets the success criterion.
+Classify other related work as stretch, next, or later so the close condition
+stays fixed.
+
+Use two independent classifications:
+
+- **Horizon:** `current`, `next`, or `later` — when the work may happen.
+- **Commitment:** `core`, `stretch`, or `candidate` — whether the active
+  milestone depends on it.
+
+Assign current stretch issues to the forge milestone and mark them as stretch.
+They do not gate closure. Spare capacity is resource-specific: unused human time
+and attention, an open agent slot, idle equipment or compute, or calendar time.
+It is spare only when core work cannot use it now and its use cannot delay a
+core dependency.
+
+When all core issues are complete and the declared demo passes, close the
+milestone. Move unfinished stretch work to `next` or `later`.
+
+For an experiment, a milestone may contain several treatments along **one
+independent variable axis**. Hold the apparatus, protocol, environment,
+measurements, and analysis fixed. Create a separate milestone for any second
+changing axis.
+
+## Governance stages
+
+Choose a project default. Classify each workstream separately. A mature project
+can contain an Explore-stage spike.
+
+| Stage | Trigger | Required loop |
+| --- | --- | --- |
+| **Explore** | No higher trigger applies; one active path fits within the current session or next day | Change → local proof → record the result and next question |
+| **Ship** | The work changes or releases a user-facing production surface | Local pre-release proof → deploy → verify the deployed surface |
+| **Manage** | The plan extends beyond the next day, two or more items compete for the same capacity, or the work needs a milestone | Ordered backlog → scoped milestone → core first, stretch on spare capacity → event/weekly review |
+| **Program** | Two or more milestones, owners, workstreams, repos, or releases must coordinate | Period outcomes → milestone sequence → dependency and release governance |
+
+Use the highest stage whose trigger applies. The owner MAY override the stage
+with a recorded reason. A user-facing production release MUST still meet the
+Ship verification rules.
+
+At Manage and Program, review stage, scope, priority, and the projected graph
+after a release, experiment or user-test result, blocker, incident, or change
+to scope, priority, dependency, or capacity. Review at least weekly when none
+occurs. See [`references/governance.md`](references/governance.md) for the
+detailed checklist and classification rules.
 
 ## The design language
 
@@ -124,14 +177,19 @@ glyphs travel inside the commit labels so the legend survives both renderers.
 
 ## Feature flags
 
-Milestone work ships dark: it merges to main behind a feature flag that is
-**off by default on main**, so code lands expeditiously instead of aging in a
-long-lived branch, while the milestone branch's **preview environment runs
-with the flag enabled**. Note the flag on the milestone boundary —
-`── milestone: billing foundation · flag: billing_v2 ──` — and draw the
-default-on flip as its own commit on main above the merge
-(`feat(billing): enable billing_v2 flag`). This section is canonical; the
-references carry only the notation.
+For deployable software, use a feature flag when it can isolate incomplete
+behavior. Keep the flag **off by default on main** and enable it in the
+milestone preview environment. The code can then land without exposing that
+behavior.
+
+Note the flag on the milestone boundary:
+`── milestone: billing foundation · flag: billing_v2 ──`. Draw the default-on
+change as its own commit on main above the merge:
+`feat(billing): enable billing_v2 flag`.
+
+For physical experiments, research, documents, and operational work that does
+not use a software flag, record the containment, reversibility, or verification
+gate in the milestone demo.
 
 ## Where a plan lives
 
@@ -429,8 +487,8 @@ demo**: the persona who watches, the channel it goes out on, and the script.
 Demo before implementation, so scope meets reality early; a milestone with no
 declared channel is a milestone nobody will see.
 
-Milestone work ships dark behind a flag (see [Feature flags](#feature-flags)),
-which is what lets the demo exist before the feature is on for everyone.
+For deployable software, follow [Feature flags](#feature-flags). For other
+milestone types, record the containment or verification gate in the demo.
 
 ### `docs/reports/`
 
