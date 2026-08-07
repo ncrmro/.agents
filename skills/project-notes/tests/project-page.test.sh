@@ -11,6 +11,9 @@ TMP=$(mktemp -d "${TMPDIR:-/tmp}/project-notes-test.XXXXXX")
 trap 'rm -rf -- "$TMP"' EXIT INT TERM
 
 export NOTES_DIR=$TMP/notes REPOS_DIR=$TMP/repos
+# Never touch the real cache, and keep the resolution assertions below live:
+# they add clones between runs, which a warm entry would hide.
+export PROJECT_NOTES_CACHE_DIR=$TMP/cache PROJECT_NOTES_CACHE_TTL=0
 mkdir -p "$NOTES_DIR/wiki/projects" "$REPOS_DIR"
 
 fail() {
@@ -98,4 +101,70 @@ printf '%s\n' "$out" | grep -F 'have: wiki/known.md' >/dev/null ||
 printf '%s\n' "$out" | grep -F 'no clone at' >/dev/null ||
   fail "repo without a clone was not reported"
 
-printf '%s\n' 'project-notes page resolution: ok'
+# --- response cache ---------------------------------------------------------
+# A repeat call must replay rather than re-query, --refresh must bypass, and a
+# degraded answer must never be stored — a cached "tea request failed" would
+# read as "no open work" for the rest of the window.
+cache=$TMP/cache2
+# Stub forges so the assertions below depend on the cache, not on whether gh
+# and tea are installed, logged in, or reachable.
+mkdir -p "$TMP/bin"
+printf '#!/bin/sh\nexit 0\n' >"$TMP/bin/gh"
+printf '#!/bin/sh\nprintf "[]\\n"\n' >"$TMP/bin/tea"
+chmod +x "$TMP/bin/gh" "$TMP/bin/tea"
+
+(
+  export PROJECT_NOTES_CACHE_DIR=$cache PROJECT_NOTES_CACHE_TTL=30
+  export PATH=$TMP/bin:$PATH
+
+  first=$("$GATHER" demo 2>/dev/null) || fail "gather.sh exited non-zero (cache warm-up)"
+  if printf '%s\n' "$first" | grep -F '> cached' >/dev/null; then
+    fail "first run replayed a cache entry"
+  fi
+  [ "$(find "$cache" -name '*.md' | wc -l)" -eq 1 ] ||
+    fail "first run did not store exactly one cache entry"
+
+  second=$("$GATHER" demo 2>/dev/null) || fail "gather.sh exited non-zero (cached)"
+  printf '%s\n' "$second" | grep -F '> cached' >/dev/null ||
+    fail "repeat run did not replay the cache entry"
+  [ "$(printf '%s\n' "$second" | grep -vF '> cached' | grep -c .)" -gt 0 ] ||
+    fail "replayed entry had no body"
+
+  if "$GATHER" demo --refresh 2>/dev/null | grep -F '> cached' >/dev/null; then
+    fail "--refresh replayed the cache entry"
+  fi
+
+  # A different argument set is a different question, so a different entry.
+  "$GATHER" demo --since 2026-01-01 >/dev/null 2>&1 ||
+    fail "gather.sh --since exited non-zero"
+  [ "$(find "$cache" -name '*.md' | wc -l)" -eq 2 ] ||
+    fail "--since did not get its own cache entry"
+
+  # A missing page fails and leaves nothing behind.
+  if "$GATHER" nosuch >/dev/null 2>&1; then
+    fail "missing page exited zero under the cache"
+  fi
+  [ "$(find "$cache" -name '*.md' | wc -l)" -eq 2 ] ||
+    fail "a failed run was cached"
+
+  # Degraded output — here a Forgejo repo whose tea call fails — stays live,
+  # so the next call retries instead of reporting an empty forge for 30 minutes.
+  rm -rf "$cache"
+  printf '#!/bin/sh\nexit 1\n' >"$TMP/bin/tea"
+  "$GATHER" demo >"$TMP/degraded.out" 2>/dev/null ||
+    fail "gather.sh exited non-zero with a failing tea"
+  grep -F 'tea request failed' "$TMP/degraded.out" >/dev/null ||
+    fail "failing tea did not report a failed request"
+  [ "$(find "$cache" -name '*.md' 2>/dev/null | wc -l)" -eq 0 ] ||
+    fail "a degraded run (tea request failed) was cached"
+  printf '#!/bin/sh\nprintf "[]\\n"\n' >"$TMP/bin/tea"
+
+  # A bad --max-age is a hard error, not a silently unknown flag.
+  if "$GATHER" demo --max-age soon >/dev/null 2>"$TMP/maxage.err"; then
+    fail "expected --max-age soon to exit non-zero"
+  fi
+  grep -F 'whole number of minutes' "$TMP/maxage.err" >/dev/null ||
+    fail "bad --max-age did not explain itself"
+) || exit 1
+
+printf '%s\n' 'project-notes page resolution + response cache: ok'

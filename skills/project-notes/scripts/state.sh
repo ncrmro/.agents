@@ -10,6 +10,8 @@ export GIT_PAGER=cat GH_PAGER=cat PAGER=cat
 
 # shellcheck source=lib/project-page.sh
 . "$(dirname "$0")/lib/project-page.sh"
+# shellcheck source=lib/cache.sh
+. "$(dirname "$0")/lib/cache.sh"
 
 usage() {
   cat <<'EOF'
@@ -23,7 +25,16 @@ Usage:
   state.sh --mine                limit GitHub PR/issue rows to involves:@me
   state.sh --all                 do not auto-scope contributor-owned projects
   state.sh --search QUERY        extra GitHub PR/issue search qualifier
+  state.sh --refresh             ignore the cached answer; fetch and query live
+  state.sh --max-age MIN         treat a cached answer older than MIN as stale
   state.sh -h | --help
+
+Caching: an answer is reused for 30 minutes per (slug, flags), and the same
+window rate-limits the `git fetch --tags`, so calling this again while writing
+the page costs nothing. A replayed answer says so on its first line. Pass
+--refresh after you push, open a PR, or tag a release. Failed and degraded runs
+are never cached. PROJECT_NOTES_CACHE_TTL sets the default window (0 disables
+it); PROJECT_NOTES_CACHE_DIR sets where entries live.
 
 Use this before hand-editing a project page when work spans repos or when a
 request says “find/document what is happening”. It complements gather.sh:
@@ -131,6 +142,8 @@ repos=() slug='' repolist='' target='' mine='' all='' extra_search=''
 while [ $# -gt 0 ]; do
   case "$1" in
     -h | --help) usage; exit 0 ;;
+    --refresh | --no-cache) CACHE_REFRESH=1; shift; continue ;;
+    --max-age) cache_set_ttl "${2:-}"; shift 2 || exit 1; continue ;;
     --repos) repolist=${2:-}; shift 2 || exit 1 ;;
     --target) target=${2:-}; shift 2 || exit 1 ;;
     --mine) mine=1; shift ;;
@@ -141,157 +154,169 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -n "$target" ]; then
-  if ! parse_target "$target"; then
-    echo "error: unrecognized target '$target' (want OWNER/REPO or URL)" >&2
+main() {
+  if [ -n "$target" ]; then
+    if ! parse_target "$target"; then
+      echo "error: unrecognized target '$target' (want OWNER/REPO or URL)" >&2
+      exit 1
+    fi
+    repos=("$repo")
+  elif [ -n "$repolist" ]; then
+    IFS=', ' read -r -a repos <<<"$repolist"
+  elif [ -n "$slug" ]; then
+    page=$(project_page "$slug") || exit 1
+    while IFS= read -r line; do repos+=("$line"); done < <(page_repos "$page")
+    if [ -z "$all" ] && [ "$(page_ownership "$page")" = contributor ]; then
+      mine=1
+    fi
+    echo "# project-notes state: $slug ($page)"
+    echo
+  else
+    echo "error: give a project SLUG, --repos OWNER/REPO, or --target OWNER/REPO" >&2
+    usage >&2
     exit 1
   fi
-  repos=("$repo")
-elif [ -n "$repolist" ]; then
-  IFS=', ' read -r -a repos <<<"$repolist"
-elif [ -n "$slug" ]; then
-  page=$(project_page "$slug") || exit 1
-  while IFS= read -r line; do repos+=("$line"); done < <(page_repos "$page")
-  if [ -z "$all" ] && [ "$(page_ownership "$page")" = contributor ]; then
-    mine=1
-  fi
-  echo "# project-notes state: $slug ($page)"
-  echo
-else
-  echo "error: give a project SLUG, --repos OWNER/REPO, or --target OWNER/REPO" >&2
-  usage >&2
-  exit 1
-fi
 
-if [ ${#repos[@]} -eq 0 ]; then
-  echo "- no repos found — add a \`repos:\` list to the page frontmatter or pass --repos"
-  exit 0
-fi
-
-for repo in "${repos[@]}"; do
-  [ -n "$repo" ] || continue
-  checkout=$(find_checkout "$repo" || true)
-  if [ -n "$checkout" ]; then
-    origin=$(git -C "$checkout" remote get-url origin 2>/dev/null || true)
-    if parse_target "$origin"; then
-      :
-    else
-      host=github.com
-    fi
-  else
-    host=$(forge_host "$repo" 2>/dev/null || echo github.com)
-  fi
-  scope_search=${extra_search:-}
-  if [ -n "$mine" ]; then
-    scope_search="${scope_search:+$scope_search }involves:@me"
+  if [ ${#repos[@]} -eq 0 ]; then
+    echo "- no repos found — add a \`repos:\` list to the page frontmatter or pass --repos"
+    exit 0
   fi
 
-  echo "## $host/$repo"
-  [ -n "$scope_search" ] && echo "- forge scope: $scope_search"
-
-  if [ -n "$checkout" ]; then
-    (
-      cd "$checkout" || exit 1
-      main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
-      main=${main:-main}
-      gitdir=$(git rev-parse --git-dir)
-      if [ -z "$(find "$gitdir/FETCH_HEAD" -mmin -10 2>/dev/null)" ]; then
-        git fetch --quiet --tags 2>/dev/null || true
+  for repo in "${repos[@]}"; do
+    [ -n "$repo" ] || continue
+    checkout=$(find_checkout "$repo" || true)
+    if [ -n "$checkout" ]; then
+      origin=$(git -C "$checkout" remote get-url origin 2>/dev/null || true)
+      if parse_target "$origin"; then
+        :
+      else
+        host=github.com
       fi
-      last_tag=$(git tag --list 'v*' --sort=-v:refname | head -1)
-      tip=$(git rev-parse --verify -q "origin/$main" 2>/dev/null ||
-        git rev-parse --verify -q "$main" 2>/dev/null || echo HEAD)
-      range=${last_tag:+$last_tag..}$tip
+    else
+      host=$(forge_host "$repo" 2>/dev/null || echo github.com)
+    fi
+    scope_search=${extra_search:-}
+    if [ -n "$mine" ]; then
+      scope_search="${scope_search:+$scope_search }involves:@me"
+    fi
 
+    echo "## $host/$repo"
+    [ -n "$scope_search" ] && echo "- forge scope: $scope_search"
+
+    if [ -n "$checkout" ]; then
+      (
+        cd "$checkout" || exit 1
+        main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+        main=${main:-main}
+        gitdir=$(git rev-parse --git-dir)
+        # Same window as the response cache: --refresh (CACHE_TTL window of 0)
+        # means "fetch now", anything else reuses a recent fetch.
+        if [ -n "$CACHE_REFRESH" ] ||
+          [ -z "$(find "$gitdir/FETCH_HEAD" -mmin "-${CACHE_TTL:-30}" 2>/dev/null)" ]; then
+          git fetch --quiet --tags 2>/dev/null || true
+        fi
+        last_tag=$(git tag --list 'v*' --sort=-v:refname | head -1)
+        tip=$(git rev-parse --verify -q "origin/$main" 2>/dev/null ||
+          git rev-parse --verify -q "$main" 2>/dev/null || echo HEAD)
+        range=${last_tag:+$last_tag..}$tip
+
+        echo
+        echo "### local git evidence"
+        echo "- checkout: $checkout"
+        echo "- default branch: $main @ $(git log -1 --format='%h %s' "$tip" 2>/dev/null)"
+        echo "- last release (bottom ◇): ${last_tag:-none (v* tags only)} $(git log -1 --format='— %as' "$last_tag" 2>/dev/null)"
+
+        echo
+        echo "### shipped since ${last_tag:-the beginning} (● rows, newest first)"
+        shipped=$(git log --format='- ● %h %s' "$range" -- 2>/dev/null | head -80)
+        printf '%s\n' "${shipped:-- none}"
+
+        if [ -n "$last_tag" ]; then
+          if git log --format='%s%n%b' "$range" | grep -qE '^[a-z]+(\(.+\))?!:|^BREAKING CHANGE'; then bump=major
+          elif git log --format='%s' "$range" | grep -qE '^feat(\(.+\))?:'; then bump=minor
+          else bump=patch; fi
+          core=${last_tag#v}; core=${core%%[-+]*}
+          IFS=. read -r maj min pat <<<"$core"
+          maj=${maj:-0}; min=${min:-0}; pat=${pat:-0}
+          echo
+          case "$maj$min$pat" in
+            *[!0-9]*) echo "- predicted next ◇: unknown — could not parse tag '$last_tag'" ;;
+            *)
+              case $bump in
+                major) next="$((maj + 1)).0.0" ;;
+                minor) next="$maj.$((min + 1)).0" ;;
+                patch) next="$maj.$min.$((pat + 1))" ;;
+              esac
+              echo "- predicted next ◇: v$next (next) — $bump bump by default rules (check release-please config for pre-1.0 repos)"
+              ;;
+          esac
+        fi
+
+        echo
+        echo "### milestone dirs (docs/milestones/M<n>-<slug>/)"
+        found=
+        for f in docs/milestones/M*/readme.md docs/milestones/M*/README.md; do
+          [ -f "$f" ] || continue
+          found=1
+          dir=$(basename "$(dirname "$f")")
+          n=${dir#M}; n=${n%%-*}
+          case "$n" in N | n) state="draft (RFC — not yet on the graph)" ;; *) state=active ;; esac
+          title=$(grep -m1 '^# ' "$f" | sed 's/^# *//')
+          echo "- $dir · $state · ${title:-untitled} · $f"
+        done
+        [ -n "$found" ] || echo "- none found"
+      )
+    else
       echo
       echo "### local git evidence"
-      echo "- checkout: $checkout"
-      echo "- default branch: $main @ $(git log -1 --format='%h %s' "$tip" 2>/dev/null)"
-      echo "- last release (bottom ◇): ${last_tag:-none (v* tags only)} $(git log -1 --format='— %as' "$last_tag" 2>/dev/null)"
-
-      echo
-      echo "### shipped since ${last_tag:-the beginning} (● rows, newest first)"
-      shipped=$(git log --format='- ● %h %s' "$range" -- 2>/dev/null | head -80)
-      printf '%s\n' "${shipped:-- none}"
-
-      if [ -n "$last_tag" ]; then
-        if git log --format='%s%n%b' "$range" | grep -qE '^[a-z]+(\(.+\))?!:|^BREAKING CHANGE'; then bump=major
-        elif git log --format='%s' "$range" | grep -qE '^feat(\(.+\))?:'; then bump=minor
-        else bump=patch; fi
-        core=${last_tag#v}; core=${core%%[-+]*}
-        IFS=. read -r maj min pat <<<"$core"
-        maj=${maj:-0}; min=${min:-0}; pat=${pat:-0}
-        echo
-        case "$maj$min$pat" in
-          *[!0-9]*) echo "- predicted next ◇: unknown — could not parse tag '$last_tag'" ;;
-          *)
-            case $bump in
-              major) next="$((maj + 1)).0.0" ;;
-              minor) next="$maj.$((min + 1)).0" ;;
-              patch) next="$maj.$min.$((pat + 1))" ;;
-            esac
-            echo "- predicted next ◇: v$next (next) — $bump bump by default rules (check release-please config for pre-1.0 repos)"
-            ;;
-        esac
-      fi
-
-      echo
-      echo "### milestone dirs (docs/milestones/M<n>-<slug>/)"
-      found=
-      for f in docs/milestones/M*/readme.md docs/milestones/M*/README.md; do
-        [ -f "$f" ] || continue
-        found=1
-        dir=$(basename "$(dirname "$f")")
-        n=${dir#M}; n=${n%%-*}
-        case "$n" in N | n) state="draft (RFC — not yet on the graph)" ;; *) state=active ;; esac
-        title=$(grep -m1 '^# ' "$f" | sed 's/^# *//')
-        echo "- $dir · $state · ${title:-untitled} · $f"
-      done
-      [ -n "$found" ] || echo "- none found"
-    )
-  else
-    echo
-    echo "### local git evidence"
-    echo "- skipped: no checkout found under $REPOS with origin ending in $repo"
-  fi
-
-  echo
-  echo "### open PRs (◉ lanes; base != main ⇒ stacked)"
-  if [ "$host" = github.com ]; then
-    if command -v gh >/dev/null 2>&1; then
-      if prs=$(gh_json_template "$repo" "$scope_search" 2>/dev/null); then
-        printf '%s\n' "${prs:-- none}"
-        echo
-        echo "### pending release PR"
-        printf '%s\n' "$prs" | grep -E 'release-please--|chore(\([^)]*\))?: release [0-9]' || echo "- none"
-      else
-        echo "- gh pr list failed (auth, network, permissions, or rate limit)"
-      fi
-    else
-      echo "- gh not installed; list GitHub PRs manually"
+      echo "- skipped: no checkout found under $REPOS with origin ending in $repo"
     fi
-  elif command -v tea >/dev/null 2>&1; then
-    echo "- via tea (default login — ensure it matches $host; base branch may be absent)"
-    tea pr list --repo "$repo" --output simple 2>/dev/null || echo "- tea failed — is a login configured for $host?"
-  else
-    echo "- tea not installed; list non-GitHub PRs manually"
-  fi
 
-  echo
-  echo "### forge milestones and open issues (○ candidates)"
-  if [ "$host" = github.com ] && command -v gh >/dev/null 2>&1; then
-    gh api "repos/$repo/milestones?state=all" --jq \
-      '.[] | "- \(.title) [\(.state)] — \(.open_issues) open / \(.closed_issues) closed"' 2>/dev/null || echo "- milestones unavailable"
-    issue_args=(-R "$repo" --limit 500)
-    [ -n "$scope_search" ] && issue_args+=(--search "$scope_search")
-    gh issue list "${issue_args[@]}" --json number,title,url,milestone --jq \
-      'map(select(.milestone != null)) | group_by(.milestone.title) | .[]
-       | "  #### \(.[0].milestone.title)", (.[] | "  - ○ [Issue #\(.number)](\(.url)): \(.title)")' 2>/dev/null || true
-  elif [ "$host" != github.com ] && command -v tea >/dev/null 2>&1; then
-    tea milestones list --repo "$repo" --output simple 2>/dev/null || echo "- milestones unavailable"
-  else
-    echo "- no forge access; use local milestone dirs and gather.sh output"
-  fi
+    echo
+    echo "### open PRs (◉ lanes; base != main ⇒ stacked)"
+    if [ "$host" = github.com ]; then
+      if command -v gh >/dev/null 2>&1; then
+        if prs=$(gh_json_template "$repo" "$scope_search" 2>/dev/null); then
+          printf '%s\n' "${prs:-- none}"
+          echo
+          echo "### pending release PR"
+          printf '%s\n' "$prs" | grep -E 'release-please--|chore(\([^)]*\))?: release [0-9]' || echo "- none"
+        else
+          degraded "gh pr list failed (auth, network, permissions, or rate limit)"
+        fi
+      else
+        degraded "gh not installed; list GitHub PRs manually"
+      fi
+    elif command -v tea >/dev/null 2>&1; then
+      echo "- via tea (default login — ensure it matches $host; base branch may be absent)"
+      tea pr list --repo "$repo" --output simple 2>/dev/null || degraded "tea failed — is a login configured for $host?"
+    else
+      degraded "tea not installed; list non-GitHub PRs manually"
+    fi
 
-  echo
-done
+    echo
+    echo "### forge milestones and open issues (○ candidates)"
+    if [ "$host" = github.com ] && command -v gh >/dev/null 2>&1; then
+      gh api "repos/$repo/milestones?state=all" --jq \
+        '.[] | "- \(.title) [\(.state)] — \(.open_issues) open / \(.closed_issues) closed"' 2>/dev/null || degraded "milestones unavailable"
+      issue_args=(-R "$repo" --limit 500)
+      [ -n "$scope_search" ] && issue_args+=(--search "$scope_search")
+      gh issue list "${issue_args[@]}" --json number,title,url,milestone --jq \
+        'map(select(.milestone != null)) | group_by(.milestone.title) | .[]
+         | "  #### \(.[0].milestone.title)", (.[] | "  - ○ [Issue #\(.number)](\(.url)): \(.title)")' 2>/dev/null || true
+    elif [ "$host" != github.com ] && command -v tea >/dev/null 2>&1; then
+      tea milestones list --repo "$repo" --output simple 2>/dev/null || degraded "milestones unavailable"
+    else
+      degraded "no forge access; use local milestone dirs and gather.sh output"
+    fi
+
+    echo
+  done
+}
+
+# The surrounding checkout is part of the identity: find_checkout prefers it, so
+# the same slug reports different local evidence from a worktree than from the
+# clone. Its toplevel, not $PWD — every subdirectory of one worktree gives the
+# same answer and should share one entry.
+here=$(git rev-parse --show-toplevel 2>/dev/null || true)
+cache_run "$(cache_file state "$slug" "$repolist" "$target" "$mine" "$all" "$extra_search" "$here")" main || exit $?

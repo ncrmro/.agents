@@ -12,7 +12,8 @@ how to resume work on it:
 ```text
 ~/notes/wiki/projects/<slug>/
 ├── README.md      # current state — mission, repos, milestones, Open Tasks
-└── SESSIONS.md    # agent session history — who did what, and how to resume it
+├── SESSIONS.md    # agent session history — who did what, and how to resume it
+└── socials.md     # optional — the account registry, owned by `social-accounts`
 ```
 
 The vault is an Obsidian-style knowledge base that auto-commits and pushes every
@@ -207,6 +208,22 @@ checkouts.
 items closed since the given date. `--help` covers the other forms; run
 `--since` alone when refreshing a page, since its output is a superset of the
 bare form's.
+
+Both are cached per (slug, flags) for 30 minutes, and the same window
+rate-limits `state.sh`'s `git fetch --tags`, so running them again while you
+write the page is free — do not skip a gatherer to save a fetch, and do not
+paraphrase an earlier run from memory. A replayed answer says so on its first
+line: `> cached 4m ago (max-age 30m)`.
+
+Re-run with `--refresh` when the cached line is older than the question
+deserves, and always after you change forge or git state in the same session —
+a push, a PR opened or merged, an issue closed, a release tagged. `--max-age
+MIN` narrows the window for one call; `PROJECT_NOTES_CACHE_TTL=0` disables the
+cache entirely. A section that could not be queried — no login, a rate limit,
+a missing `gh`/`tea` — prints a `- ⚠ …` row instead of an answer, and that run
+is never cached, so a broken run never masquerades as an empty forge. Treat a
+`⚠` row as "unknown", never as "nothing open". `harvest.sh` reads only local
+files and is not cached.
 
 `project-planning` still owns the projected-git-graph design language and any
 canonical `PLAN.md` graph. This skill's `state.sh` is only the evidence-gathering
