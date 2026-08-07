@@ -192,12 +192,17 @@ and out, so a screenshot's coordinates go stale mid-sequence: a click aimed at
 control immediately before clicking it. This is the opposite failure to the one
 below and the two are told apart by whether the layout is moving.
 
-**A subpanel's confirm button is not the dialog's.** In that same editor the
-*Edit bio* subpanel's *Done* returned to the main panel on one run and closed
-the entire dialog on another — and the bio persisted in neither. Some fields in
-one dialog commit independently of others: the link, entered through its own
-subpanel, saved on the first try while the bio never saved at all. Verify each
-field on the live profile separately; a dialog is not one transaction.
+**A subpanel's confirm button is not the dialog's.** Threads' editor is a
+**two-stage commit**: each field opens a subpanel whose *Done* only returns the
+value to the main panel, and the main panel's *Done* is what writes. A value
+staged but not committed is discarded silently — no error, no warning. Three
+saves were lost this way before the mechanism was clear.
+
+Read the **main panel** between the two stages: the row must show the new value
+instead of its empty-state label. That check is free and it is the difference
+between a save and a no-op. Do not generalise across fields either — in the same
+dialog, links committed from their own subpanel while the bio did not, which is
+what made a sequencing bug look like a field-specific one.
 
 **Clicking Save by element reference is not reliable.** In that same failure the
 button was scrolled out of the viewport; a ref-targeted click reported success
