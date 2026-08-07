@@ -81,7 +81,10 @@ Steps 3's per-repo scans are independent; run them concurrently.
      `chat`, `email`, `schedule`, `manual` — and free-form strings where it
      does not.
    - Preview environments and CI smoke tests.
-   - Required checks and agent or adversarial review steps.
+   - Required checks, a merge queue, and agent or adversarial review steps.
+     Read these from the rulesets API (`gh api repos/<org>/<repo>/rulesets`
+     and the branch rules endpoint) — the classic branch-protection endpoint
+     often returns 404 even where rules exist.
    - Session capture: are agent session logs uploaded or archived (CI
      artifacts, a records store), or lost when the session ends on the
      laptop.
