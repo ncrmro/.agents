@@ -185,6 +185,20 @@ unless a post is intended, but its absence means the save did not land. That
 signal earned its keep on 2026-08-07: a save produced no prompt and no error,
 and the live page still held the old text.
 
+**Where a dialog animates, click by element reference, not by coordinate.**
+**verified: 2026-08-07, Threads.** Its edit-profile panel slides subpanels in
+and out, so a screenshot's coordinates go stale mid-sequence: a click aimed at
+*Bio* landed on *Interests* once the panel had shifted. Re-run `find` for each
+control immediately before clicking it. This is the opposite failure to the one
+below and the two are told apart by whether the layout is moving.
+
+**A subpanel's confirm button is not the dialog's.** In that same editor the
+*Edit bio* subpanel's *Done* returned to the main panel on one run and closed
+the entire dialog on another — and the bio persisted in neither. Some fields in
+one dialog commit independently of others: the link, entered through its own
+subpanel, saved on the first try while the bio never saved at all. Verify each
+field on the live profile separately; a dialog is not one transaction.
+
 **Clicking Save by element reference is not reliable.** In that same failure the
 button was scrolled out of the viewport; a ref-targeted click reported success
 and did nothing. Scrolling the form to the top and clicking the button's
