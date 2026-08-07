@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ncrmro.com/agents/schemas/sdlc-report/sdlc-report.json",
+  "title": "Agentic SDLC maturity report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "generated_at",
+    "scope",
+    "maturity",
+    "repos",
+    "harnesses",
+    "models",
+    "governance",
+    "duplication",
+    "metrics",
+    "recommendations",
+    "evidence_limits"
+  ],
+  "properties": {
+    "report_version": { "const": "1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "forge", "repos_surveyed", "includes_private"],
+      "properties": {
+        "kind": { "enum": ["org", "user", "repo-set"] },
+        "name": { "type": "string" },
+        "forge": { "enum": ["github", "forgejo", "gitlab", "other"] },
+        "repos_surveyed": { "type": "integer", "minimum": 0 },
+        "repos_total": { "type": ["integer", "null"], "minimum": 0 },
+        "includes_private": { "type": "boolean" },
+        "sampling_note": { "type": ["string", "null"] }
+      }
+    },
+    "maturity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "rationale"],
+      "properties": {
+        "level": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "rationale": { "type": "string" },
+        "next_rung_blockers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "repos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "maturity_level", "context_layer", "automation", "review_posture", "session_capture"],
+        "properties": {
+          "name": { "type": "string" },
+          "default_branch": { "type": "string" },
+          "maturity_level": { "type": "integer", "minimum": 0, "maximum": 5 },
+          "context_layer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["instruction_files", "dotagents_tree", "docs_quality"],
+            "properties": {
+              "instruction_files": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Agent instruction files found at the repo root, e.g. AGENTS.md, CLAUDE.md"
+              },
+              "dotagents_tree": { "type": "boolean" },
+              "docs_quality": { "enum": ["none", "thin", "adequate", "strong"] }
+            }
+          },
+          "automation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ci_agent_workflows", "entry_points"],
+            "properties": {
+              "ci_agent_workflows": { "type": "boolean" },
+              "entry_points": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Triggers that start agent work; prefer the vocabulary in SKILL.md step 3"
+              },
+              "preview_environments": { "type": "boolean" },
+              "ci_smoke_tests": { "type": "boolean" }
+            }
+          },
+          "review_posture": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["agent_review"],
+            "properties": {
+              "agent_review": { "type": "boolean" },
+              "adversarial_review": { "type": "boolean" },
+              "required_checks": { "type": "boolean" }
+            }
+          },
+          "session_capture": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["captured"],
+            "properties": {
+              "captured": { "enum": ["none-found", "partial", "systematic"] },
+              "store": { "type": ["string", "null"] }
+            }
+          },
+          "notes": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "harnesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "evidence": { "enum": ["observed", "user-reported"] },
+          "surfaces": {
+            "type": "array",
+            "items": { "enum": ["local", "ci", "cluster"] }
+          }
+        }
+      }
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["multi_llm", "vendors"],
+      "properties": {
+        "multi_llm": { "type": "boolean" },
+        "vendors": { "type": "array", "items": { "type": "string" } },
+        "routing_and_spend_notes": { "type": ["string", "null"] }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["audit_record", "session_data_ownership"],
+      "properties": {
+        "audit_record": { "enum": ["none-found", "scattered", "central"] },
+        "session_data_ownership": { "enum": ["none-found", "vendor-held", "partial", "owned"] },
+        "shared_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["repo"],
+            "properties": {
+              "repo": { "type": "string" },
+              "pinned": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "duplication": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description", "repos"],
+        "properties": {
+          "description": { "type": "string" },
+          "repos": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+          "evidence": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pr_cycle_time_days_median": { "type": ["number", "null"], "minimum": 0 },
+        "pr_rework_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "window_days": { "type": ["integer", "null"], "minimum": 1 },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["priority", "title", "rationale", "target_level"],
+        "properties": {
+          "priority": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "rationale": { "type": "string" },
+          "target_level": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "effort": { "enum": ["low", "medium", "high"] }
+        }
+      }
+    },
+    "evidence_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    }
+  }
+}
