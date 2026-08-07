@@ -154,6 +154,54 @@ Then verify by **reloading the profile and reading the live page**, not by
 trusting the form's success state. A settings form will report saved over a
 value the platform normalized, truncated, or rejected.
 
+### A cleared Save button is not evidence
+
+**verified: 2026-08-07, LinkedIn company page.** A settings form can fail with
+no error at all. Observed end to end: the field accepted 1,354 characters, the
+counter updated, the Save button and its Discard sibling both disappeared as
+they do on success — and the value never persisted. Two full rounds of logo and
+description were lost this way, each looking successful in the form.
+
+The cause was a **server-side concurrency lock**: another admin session held the
+page. Its only tell was a toast that auto-dismisses —
+
+> Another admin is trying to make changes to this page at the same time as you.
+
+Image uploads failed differently under the same lock (`Cover image upload
+failed. Please refresh the page and try again`) and repeated indefinitely.
+
+Two rules follow, and they generalize past LinkedIn:
+
+- **Read the value back off the public page after every save**, not off the
+  form. Where the platform redirects admins to a dashboard, force the member
+  view (LinkedIn: `?viewAsMember=true`).
+- **A save that silently no-ops is a signal, not a flake.** Stop and find the
+  other session. Retrying under a lock cost far more time here than waiting
+  would have, and each retry looked like it had worked.
+
+Learn what the platform's *real* success signal is. On LinkedIn it is the
+"Share your page edits" prompt offering to announce the change — decline it
+unless a post is intended, but its absence means the save did not land.
+
+### Uploading an avatar or banner
+
+- **Never click a file input.** It opens a native OS picker that no automation
+  can see or dismiss, and it blocks every subsequent browser event. Put the file
+  on the input element directly.
+- **The input may not exist yet.** LinkedIn keeps the logo input in the DOM
+  permanently but creates the cover input only when the *Add/Edit cover image*
+  menu item is clicked — and only by a **real mouse click**; a scripted
+  `.click()` on that item does nothing at all. If a menu item must be clicked
+  and you fear it triggers a picker, patch `HTMLInputElement.prototype.click` to
+  a no-op for `type=file` first, then restore it.
+- **Expect a crop step on banners and not on avatars**, and expect it to need an
+  explicit *Apply*.
+- **Platforms overlay the avatar tile on the banner.** LinkedIn covers roughly
+  the first 23% of the banner's width with the square logo. A banner whose
+  content is centred normally loses its opening characters behind it — pad the
+  render clear of the tile, and check the composed result on the live page
+  rather than admiring the source image.
+
 ## Immediately after
 
 1. Write the row back: `status: owned`, `verified:` today, `method: login`,
