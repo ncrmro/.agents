@@ -181,7 +181,16 @@ Two rules follow, and they generalize past LinkedIn:
 
 Learn what the platform's *real* success signal is. On LinkedIn it is the
 "Share your page edits" prompt offering to announce the change — decline it
-unless a post is intended, but its absence means the save did not land.
+unless a post is intended, but its absence means the save did not land. That
+signal earned its keep on 2026-08-07: a save produced no prompt and no error,
+and the live page still held the old text.
+
+**Clicking Save by element reference is not reliable.** In that same failure the
+button was scrolled out of the viewport; a ref-targeted click reported success
+and did nothing. Scrolling the form to the top and clicking the button's
+on-screen position worked immediately. Put the control in view before clicking
+it, and treat "the click was reported" as weaker evidence than "the page
+changed".
 
 ### Uploading an avatar or banner
 
