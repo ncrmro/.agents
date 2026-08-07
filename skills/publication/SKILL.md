@@ -114,18 +114,13 @@ GitHub — so any automated crossing needs a GitHub credential.
 
 ### The site checkout the script pushes through
 
-`sync-posts.sh` writes into `~/notes/.repos/ncrmro/website` — a sparse,
-blobless checkout of `ncrmro/website` on `main` containing the site source
-(`lfs.fetchexclude=*` keeps legacy images out). `~/notes/posts` symlinks to its
-blog directory for direct inspection. `/.repos/` and `/posts` are gitignored by
-the vault (and `.repos` is in Obsidian's `userIgnoreFilters`), so nothing about
-this crosses into the public Forgejo repo. Edits belong in `publications/`,
-never in the checkout — the script overwrites blog files wholesale from the
-vault on every sync.
+`sync-posts.sh` writes into `~/repos/ncrmro/website` — an ordinary full clone of
+`ncrmro/website` on `main` (see `~/repos/ncrmro/AGENTS.md`). Its `POSTS` is
+`$SITE_REPO/posts`, a committed symlink to `docs/posts/`, so the script's
+`docs/posts/…` progress lines name the same directory.
 
-`.repos/<owner>/<repo>` is the pattern for any other repo the vault needs to
-reach into: sparse-checkout what you want visible, symlink it flat at the vault
-root, gitignore both.
+Edits belong in `publications/`, never in the checkout — the script overwrites
+blog files wholesale from the vault on every sync.
 
 ### Media lives in the vault, not the site repo
 
@@ -181,6 +176,22 @@ points at — that skill's frontmatter uses the same three names, and the two
 files describing one post should not disagree about what to call things.
 `publish_at` stays reserved for the canonical, where it triggers the site
 publish; a syndication entry never carries it.
+
+**One file per artifact *shape*, not per target.** `draft:` may carry an anchor
+(`syndication/2026-08-02-microblog.md#x-ncrmro-microblog`), and the same path may
+appear in more than one entry. So a piece going to five microblog channels is
+*one* file holding a variant per channel — the `social-media` multi-variant
+format — while an X article, being a different artifact, keeps its own file.
+This is what the `x-article.md` + `x-thread.md` example above was already doing:
+they are separate files because an article and a thread are different artifacts,
+not because they are different platforms.
+
+Keeping the five variants in one file is what makes drift detectable. Across
+five files, "does the LinkedIn version still say the same number after the X
+hook was softened?" takes five reads; in one file it takes one. Add `handle:` to
+an entry wherever the registry lists two accounts on the same platform, matching
+the `social-media` draft. Verify an anchor resolves before recording `scheduled`
+— a renamed heading orphans the entry silently, with no error anywhere.
 
 Three fields carry three different meanings, and conflating them is the common
 mistake:

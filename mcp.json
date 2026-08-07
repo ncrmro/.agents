@@ -4,6 +4,10 @@
       "type": "sse",
       "url": "https://mcp-grafana.ncrmro.com/sse"
     },
+    "github-projects": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/x/projects"
+    },
     "playwright": {
       "type": "stdio",
       "command": "mcp-server-playwright",

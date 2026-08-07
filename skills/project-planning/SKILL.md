@@ -92,11 +92,11 @@ history.
 
 | glyph | state |
 | --- | --- |
-| `●` | shipped — on main; short sha recorded beside it |
+| `●` | shipped — on main; short sha recorded beside it; never drawn in a lane |
 | `◉` | in flight — commit exists on a branch / open PR |
 | `○` | planned — not yet written |
 | `◇` | release boundary — a release-please tag; predictions marked `(next)` |
-| `── milestone: <name> ──` | milestone boundary — rides its branch's merge row `├─╮` in branch view; a bare separator in the flat release column |
+| `── milestone: <name> ──` | milestone boundary — rides its branch's merge row `├─╮`; otherwise, use a bare separator |
 
 Five rules:
 

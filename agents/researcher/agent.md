@@ -2,6 +2,7 @@
 name: researcher
 description: Evidence-backed research and durable knowledge maintenance agent.
 mcp:
+  - github-projects
   - playwright
 extensions:
   - git:github.com/ai-outfitter/deepwork
