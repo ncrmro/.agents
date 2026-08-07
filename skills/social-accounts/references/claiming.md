@@ -203,8 +203,14 @@ changed".
   `.click()` on that item does nothing at all. If a menu item must be clicked
   and you fear it triggers a picker, patch `HTMLInputElement.prototype.click` to
   a no-op for `type=file` first, then restore it.
-- **Expect a crop step on banners and not on avatars**, and expect it to need an
-  explicit *Apply*.
+- **Expect a crop step, and expect it to need an explicit *Apply*.** Which
+  uploads crop is per-platform and worth checking rather than assuming:
+  **verified 2026-08-07, X** — the *Edit profile* modal cropped **both** the
+  header and the avatar, each with its own *Apply*.
+- **Element refs go stale between two uploads in one dialog.** X re-renders the
+  modal after the first *Apply*, so a ref captured for the avatar input before
+  the header was applied no longer resolves. Re-run `find` for the second input
+  instead of reusing a ref from the same call.
 - **Platforms overlay the avatar tile on the banner.** LinkedIn covers roughly
   the first 23% of the banner's width with the square logo. A banner whose
   content is centred normally loses its opening characters behind it — pad the
