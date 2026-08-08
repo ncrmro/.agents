@@ -8,6 +8,18 @@
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/x/projects"
     },
+    "google-gmail": {
+      "type": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1"
+    },
+    "google-calendar": {
+      "type": "http",
+      "url": "https://calendarmcp.googleapis.com/mcp/v1"
+    },
+    "google-contacts": {
+      "type": "http",
+      "url": "https://people.googleapis.com/mcp/v1"
+    },
     "playwright": {
       "type": "stdio",
       "command": "mcp-server-playwright",
