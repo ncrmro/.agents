@@ -37,13 +37,14 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # ---- args -------------------------------------------------------------------
 branch="${1:-}"; shift || true
 task="${1:-}"; shift || true
-agent="codex"; base="origin/main"; land=""; autonomous=0; existing=0
+agent="codex"; base="origin/main"; land=""; autonomous=0; existing=0; gate_only=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --agent) agent="${2:-}"; shift 2 ;;
     --base) base="${2:-}"; shift 2 ;;
     --land) land="${2:-}"; shift 2 ;;
     --existing) existing=1; shift ;;
+    --gate-only) gate_only=1; existing=1; shift ;;   # skip the worker: gate + land an already-committed branch
     --autonomous) autonomous=1; shift ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -109,11 +110,13 @@ fi
 # Both subshells run </dev/null: this script is normally itself backgrounded,
 # and any child left reading the inherited pipe (codex exec, claude -p) hangs
 # forever waiting on stdin. The land prompt below deliberately keeps stdin.
+if [ "$gate_only" = 0 ]; then
 (
   cd "$worktree"
   echo "delegate: [$agent] working the task..." >&2
   run_agent "$task"
 ) </dev/null
+fi
 
 # Skip the gate entirely when the worker produced no commits — otherwise a
 # no-op lane burns a /simplify plus up to three /code-review invocations.
