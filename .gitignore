@@ -16,6 +16,7 @@ SCRATCH.md
 # devenv runtime state
 /.devenv/
 /.direnv/
+/.pre-commit-config.yaml
 
 __pycache__/
 *.py[cod]

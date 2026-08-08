@@ -97,6 +97,13 @@ FILES=$TMP/files
 LINKS=$TMP/links
 TAGS=$TMP/tags
 
+# These indexes are accessed through namerefs in the resolver helpers.
+# shellcheck disable=SC2034
+declare -A FILE_PATHS=() FILE_BASENAMES=() NOTE_PATHS=() NOTE_BASENAMES=()
+declare -a RESOLVED=()
+RESOLVER_INDEXED=0
+NORMALIZED_PATH=
+
 fd_common=(-t f -0 -E .git -E .obsidian -E node_modules)
 ((INCLUDE_HIDDEN)) && fd_common+=(-H)
 
@@ -113,20 +120,18 @@ build_file_indexes() {
   LC_ALL=C sort -u -o "$NOTES" "$NOTES"
 }
 
-trim() {
-  local s=$1
-  s=${s#"${s%%[![:space:]]*}"}
-  s=${s%"${s##*[![:space:]]}"}
-  printf '%s' "$s"
+trim_value() {
+  local -n value=$1
+  value=${value#"${value%%[![:space:]]*}"}
+  value=${value%"${value##*[![:space:]]}"}
 }
 
-decode_path() {
-  local s=$1
-  s=${s//%20/ }
-  s=${s//%23/#}
-  s=${s//%28/(}
-  s=${s//%29/)}
-  printf '%s' "$s"
+decode_path_value() {
+  local -n value=$1
+  value=${value//%20/ }
+  value=${value//%23/#}
+  value=${value//%28/(}
+  value=${value//%29/)}
 }
 
 # Output: source<TAB>line<TAB>kind<TAB>raw-target<TAB>clean-target
@@ -135,72 +140,135 @@ build_links() {
   build_file_indexes
   : >"$LINKS"
   local rel file hit line raw target
-  while IFS= read -r rel; do
-    file=$VAULT/$rel
+  local -a rg_common=(
+    -n -o --no-heading --color never --null --hidden
+    --glob '*.[mM][dD]' --glob '!.git/**' --glob '!.obsidian/**'
+    --glob '!node_modules/**' --pcre2
+  )
 
-    while IFS= read -r hit; do
-      line=${hit%%:*}; raw=${hit#*:}
-      target=${raw%%|*}
-      target=${target%%#*}
-      target=${target%%^*}
-      target=$(trim "$target")
-      [[ -n $target ]] || continue
-      printf '%s\t%s\twiki\t%s\t%s\n' "$rel" "$line" "$raw" "$target" >>"$LINKS"
-    done < <(rg -n -o --no-heading --color never --pcre2 '\[\[\K[^]\r\n]+' -- "$file" 2>/dev/null || true)
+  while IFS= read -r -d '' file && IFS= read -r hit; do
+    rel=${file#"$VAULT"/}
+    line=${hit%%:*}; raw=${hit#*:}
+    target=${raw%%|*}
+    target=${target%%#*}
+    target=${target%%^*}
+    trim_value target
+    [[ -n $target ]] || continue
+    printf '%s\t%s\twiki\t%s\t%s\n' "$rel" "$line" "$raw" "$target" >>"$LINKS"
+  done < <(rg "${rg_common[@]}" '\[\[\K[^]\r\n]+' -- "$VAULT" 2>/dev/null || true)
 
-    while IFS= read -r hit; do
-      line=${hit%%:*}; raw=${hit#*:}
-      if [[ $raw == \<*\>* ]]; then
-        target=${raw#<}; target=${target%%>*}
-      else
-        target=${raw%%[[:space:]]\"*}
-      fi
-      target=${target%%#*}
-      target=$(decode_path "$(trim "$target")")
-      [[ -n $target && $target != \#* ]] || continue
-      [[ $target =~ ^([[:alpha:]][[:alnum:]+.-]*:|//) ]] && continue
-      printf '%s\t%s\tmarkdown\t%s\t%s\n' "$rel" "$line" "$raw" "$target" >>"$LINKS"
-    done < <(rg -n -o --no-heading --color never --pcre2 '\]\(\K[^)\r\n]+' -- "$file" 2>/dev/null || true)
-  done <"$NOTES"
+  while IFS= read -r -d '' file && IFS= read -r hit; do
+    rel=${file#"$VAULT"/}
+    line=${hit%%:*}; raw=${hit#*:}
+    if [[ $raw == \<*\>* ]]; then
+      target=${raw#<}; target=${target%%>*}
+    else
+      target=${raw%%[[:space:]]\"*}
+    fi
+    target=${target%%#*}
+    trim_value target
+    decode_path_value target
+    [[ -n $target && $target != \#* ]] || continue
+    [[ $target =~ ^([[:alpha:]][[:alnum:]+.-]*:|//) ]] && continue
+    printf '%s\t%s\tmarkdown\t%s\t%s\n' "$rel" "$line" "$raw" "$target" >>"$LINKS"
+  done < <(rg "${rg_common[@]}" '\]\(\K[^)\r\n]+' -- "$VAULT" 2>/dev/null || true)
+
+  LC_ALL=C sort -t $'\t' -k1,1 -k2,2n -k3,3 -o "$LINKS" "$LINKS"
 }
 
-# Resolve a target and print zero, one, or multiple matching vault-relative paths.
+append_index_value() {
+  local -n index=$1
+  local key=$2 value=$3
+  if [[ -n ${index[$key]+present} ]]; then
+    index["$key"]+=$'\n'"$value"
+  else
+    index["$key"]=$value
+  fi
+}
+
+# shellcheck disable=SC2034
+build_resolver_indexes() {
+  ((RESOLVER_INDEXED == 0)) || return 0
+  build_file_indexes
+  local path base
+  while IFS= read -r path; do
+    FILE_PATHS["$path"]=$path
+    base=${path##*/}
+    append_index_value FILE_BASENAMES "$base" "$path"
+  done <"$FILES"
+  while IFS= read -r path; do
+    NOTE_PATHS["$path"]=$path
+    base=${path##*/}
+    append_index_value NOTE_BASENAMES "$base" "$path"
+  done <"$NOTES"
+  RESOLVER_INDEXED=1
+}
+
+load_index_matches() {
+  # The referenced variable is an associative array, not a scalar.
+  # shellcheck disable=SC2178
+  local -n index=$1
+  local key=$2
+  RESOLVED=()
+  [[ -n ${index[$key]+present} ]] || return 0
+  mapfile -t RESOLVED <<<"${index[$key]}"
+}
+
+normalize_path() {
+  local input=$1 segment
+  local -a parts=() stack=()
+  IFS=/ read -r -a parts <<<"$input"
+  for segment in "${parts[@]}"; do
+    case $segment in
+      ''|.) ;;
+      ..)
+        if ((${#stack[@]})) && [[ ${stack[-1]} != .. ]]; then
+          unset 'stack[-1]'
+        else
+          stack+=(..)
+        fi
+        ;;
+      *) stack+=("$segment") ;;
+    esac
+  done
+  NORMALIZED_PATH=$(IFS=/; printf '%s' "${stack[*]}")
+}
+
+# Resolve a target into the RESOLVED array.
 resolve_target() {
-  local source=$1 kind=$2 target=$3 candidate dir base escaped exact
+  local source=$1 kind=$2 target=$3 candidate dir base
+  build_resolver_indexes
+  RESOLVED=()
   target=${target#/}
   dir=${source%/*}; [[ $dir == "$source" ]] && dir=.
 
   if [[ $kind == markdown ]]; then
     candidate=$target
     [[ $candidate == /* ]] || candidate=$dir/$candidate
-    while [[ $candidate == ./* ]]; do candidate=${candidate#./}; done
-    # Collapse simple path/../ segments without requiring realpath or file existence.
-    candidate=$(awk -F/ '{ n=0; for(i=1;i<=NF;i++){if($i=="..")n--;else if($i!="."&&$i!="")a[++n]=$i} for(i=1;i<=n;i++)printf "%s%s",a[i],(i<n?"/":"") }' <<<"$candidate")
-    rg -F -x -- "$candidate" "$FILES" || true
+    normalize_path "$candidate"
+    load_index_matches FILE_PATHS "$NORMALIZED_PATH"
     return
   fi
 
   # Explicit extensions may refer to notes or attachments. Try them unchanged.
   if [[ $target == *.* ]]; then
     if [[ $target == */* ]]; then
-      exact=$(rg -F -x -- "$target" "$FILES" || true)
+      load_index_matches FILE_PATHS "$target"
     else
-      base=$(printf '%s' "$target" | sed 's/[][(){}.^$*+?|\\]/\\&/g')
-      exact=$(rg --pcre2 "(^|/)${base}$" "$FILES" || true)
+      load_index_matches FILE_BASENAMES "$target"
     fi
-    if [[ -n $exact ]]; then printf '%s\n' "$exact"; return; fi
+    ((${#RESOLVED[@]} == 0)) || return
   fi
 
   candidate=$target
   [[ ${candidate,,} == *.md ]] || candidate+=.md
   if [[ $target == */* ]]; then
-    rg -F -x -- "$candidate" "$NOTES" || true
+    load_index_matches NOTE_PATHS "$candidate"
     return
   fi
 
   base=${candidate##*/}
-  escaped=$(printf '%s' "$base" | sed 's/[][(){}.^$*+?|\\]/\\&/g')
-  rg --pcre2 "(^|/)${escaped}$" "$NOTES" || true
+  load_index_matches NOTE_BASENAMES "$base"
 }
 
 # Output: status<TAB>source<TAB>line<TAB>kind<TAB>target<TAB>matches
@@ -208,8 +276,9 @@ link_report() {
   build_links
   local source line kind raw target matches count status joined
   while IFS=$'\t' read -r source line kind raw target; do
-    mapfile -t matches < <(resolve_target "$source" "$kind" "$target")
-    count=${#matches[@]}
+    resolve_target "$source" "$kind" "$target"
+    matches=("${RESOLVED[@]}")
+    count=${#RESOLVED[@]}
     status=ok; joined=
     if ((count == 0)); then
       status=missing
@@ -230,7 +299,7 @@ print_report_status() {
     [[ $status == "$wanted" ]] || continue
     found=1
     if [[ $wanted == ambiguous ]]; then
-      printf '%s:%s: %s -> %s (%s)\n' "$source" "$line" "$target" "$matches"
+      printf '%s:%s: %s -> %s\n' "$source" "$line" "$target" "$matches"
     else
       printf '%s:%s: %s\n' "$source" "$line" "$target"
     fi
@@ -254,6 +323,7 @@ command_links() {
     fi
     printf '%s:%s\t%s\t%s\n' "$source" "$line" "$kind" "$target"
   done <"$LINKS"
+  return 0
 }
 
 command_backlinks() {
@@ -271,10 +341,12 @@ command_backlinks() {
   [[ -n $target_note ]] || die "note not found: $1"
 
   while IFS=$'\t' read -r source line kind raw target; do
-    while IFS= read -r resolved; do
+    resolve_target "$source" "$kind" "$target"
+    for resolved in "${RESOLVED[@]}"; do
       [[ $resolved == "$target_note" ]] && printf '%s:%s\t%s\n' "$source" "$line" "$target"
-    done < <(resolve_target "$source" "$kind" "$target")
+    done
   done <"$LINKS"
+  return 0
 }
 
 command_orphans() {
@@ -282,9 +354,10 @@ command_orphans() {
   local incoming=$TMP/incoming source line kind raw target resolved
   : >"$incoming"
   while IFS=$'\t' read -r source line kind raw target; do
-    while IFS= read -r resolved; do
+    resolve_target "$source" "$kind" "$target"
+    for resolved in "${RESOLVED[@]}"; do
       [[ ${resolved,,} == *.md ]] && printf '%s\n' "$resolved" >>"$incoming"
-    done < <(resolve_target "$source" "$kind" "$target")
+    done
   done <"$LINKS"
   LC_ALL=C sort -u -o "$incoming" "$incoming"
   comm -23 "$NOTES" "$incoming"
@@ -343,13 +416,15 @@ command_tag() {
     fi
     printf '%s:%s\t#%s\n' "$source" "$line" "$tag"
   done <"$TAGS"
+  return 0
 }
 
 command_stats() {
   build_file_indexes; build_links; build_tags
-  local missing ambiguous
-  missing=$(link_report | awk -F '\t' '$1=="missing"{n++} END{print n+0}')
-  ambiguous=$(link_report | awk -F '\t' '$1=="ambiguous"{n++} END{print n+0}')
+  local report=$TMP/report missing ambiguous
+  link_report >"$report"
+  missing=$(awk -F '\t' '$1=="missing"{n++} END{print n+0}' "$report")
+  ambiguous=$(awk -F '\t' '$1=="ambiguous"{n++} END{print n+0}' "$report")
   printf 'Vault:           %s\n' "$VAULT"
   printf 'Markdown notes:  %s\n' "$(wc -l <"$NOTES")"
   printf 'Internal links:  %s\n' "$(wc -l <"$LINKS")"
