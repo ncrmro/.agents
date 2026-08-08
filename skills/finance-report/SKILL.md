@@ -1,6 +1,6 @@
 ---
 name: finance-report
-description: Create reconciled monthly and yearly finance reports with Q1-Q4 sections from bank and credit-card statements. Use DuckDB with CSV, OFX, QFX, or PDF records that need spending, income, transfer, category, month, quarter, or year summaries.
+description: Create reconciled monthly and yearly finance reports with Q1-Q4 sections from bank and credit-card statements. Use DuckDB with CSV, OFX, QFX, or PDF records, and render temporary HTML and PDF reports for review.
 ---
 
 # Finance report
@@ -13,6 +13,7 @@ Read these files when you need more detail:
 - `references/ledger-schema.md` — normalization, sign rules, deduplication, and reconciliation
 - `references/duckdb.md` — DuckDB tables, views, import rules, and report queries
 - `references/report-templates.md` — required monthly and yearly report structures
+- `references/rendering.md` — temporary HTML and PDF rendering and review rules
 
 ## Do not count payments as spending
 
@@ -187,6 +188,23 @@ The following equations MUST hold:
 Report discrepancies. Do not force a balancing adjustment without a source
 record.
 
+### 9. Render temporary review files
+
+Keep the Markdown report as the canonical report. Render temporary HTML and PDF
+copies after all verification checks pass.
+
+From the finance-report skill directory, run:
+
+```sh
+scripts/render-report.sh PATH/TO/REPORT.md
+```
+
+The script creates a private temporary directory. It writes a self-contained
+HTML file and a PDF file. Return both paths to the user.
+
+Read `references/rendering.md` before you publish, copy, or delete a rendered
+file.
+
 ## Quick diagnostics
 
 | Symptom | Cause | Fix |
@@ -200,6 +218,8 @@ record.
 | Money totals differ by a cent | Money was stored as a floating-point value | Cast source values to `DECIMAL` before aggregation |
 | DuckDB is not available | The Nix profile does not contain DuckDB | Run the guarded Nix profile installation |
 | DuckDB is installed but is not on `PATH` | The Nix profile binary directory is absent from `PATH` | Fix `PATH`, run `rehash`, and check `command -v duckdb` |
+| HTML renders but PDF generation fails | WeasyPrint is absent or reports a font or CSS error | Install WeasyPrint and run the renderer again |
+| The HTML report has no styling | The renderer did not embed the CSS file | Use `scripts/render-report.sh`; do not call Pandoc without `--embed-resources` |
 
 ## Completion criteria
 
@@ -210,3 +230,5 @@ record.
   quarters.
 - Unknown or uncertain classifications MUST remain visible.
 - Reports MUST NOT present tax, legal, or investment advice as fact.
+- Temporary HTML and PDF reports MUST match the verified Markdown report.
+- Temporary reports MUST use private file permissions.

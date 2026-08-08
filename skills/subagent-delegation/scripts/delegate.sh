@@ -129,11 +129,11 @@ gate_status=0
 (
   cd "$worktree"
   echo "delegate: /simplify" >&2
-  claude -p "/simplify" "${claude_auto[@]}"
+  claude -p "/simplify" "${claude_auto[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
   for pass in 1 2 3; do
     before="$(git rev-parse HEAD)"
     echo "delegate: /code-review (pass $pass)" >&2
-    claude -p "/code-review" "${claude_auto[@]}"
+    claude -p "/code-review" "${claude_auto[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
     [ "$(git rev-parse HEAD)" = "$before" ] && exit 0
   done
   exit 42   # still churning after 3 passes
@@ -166,8 +166,13 @@ case "$land" in
   direct)
     local_base="${base#origin/}"
     git -C "$repo_root" switch "$local_base"
+    git -C "$repo_root" pull --ff-only origin "$local_base" 2>/dev/null || true
     git -C "$repo_root" merge --squash "$branch"
-    git -C "$repo_root" commit --no-edit
+    # Squash message: first lane commit's subject as the headline, the rest as
+    # the body — not git's default "Squashed commit of the following" dump.
+    subject="$(git -C "$repo_root" log --reverse --format=%s "$local_base..$branch" | head -n1)"
+    body="$(git -C "$repo_root" log --reverse --format='- %s' "$local_base..$branch" | tail -n +2)"
+    git -C "$repo_root" commit -m "$subject" ${body:+-m "$body"}
     git -C "$repo_root" push
     cleanup_worktree
     git -C "$repo_root" branch -D "$branch" 2>/dev/null || true
