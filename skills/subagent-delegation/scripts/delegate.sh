@@ -164,6 +164,9 @@ case "$land" in
     echo "delegate: PR squash-merge requested. If GitHub reports CONFLICTING, rebase in the worktree, re-gate, push --force-with-lease, and merge again." >&2
     ;;
   direct)
+    # Concurrent lanes land through the same main checkout — serialize.
+    exec 9>"$repo_root/.git/delegate-land.lock"
+    flock 9
     local_base="${base#origin/}"
     git -C "$repo_root" switch "$local_base"
     git -C "$repo_root" pull --ff-only origin "$local_base" 2>/dev/null || true
