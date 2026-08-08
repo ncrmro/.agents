@@ -118,8 +118,15 @@ fi
 # Skip the gate entirely when the worker produced no commits — otherwise a
 # no-op lane burns a /simplify plus up to three /code-review invocations.
 if git -C "$worktree" diff --quiet "$base"...HEAD 2>/dev/null; then
-  echo "delegate: no commits on $branch — nothing to land." >&2
-  cleanup_worktree; exit 0
+  # A worker that edited but never committed (sandbox denial, model choice)
+  # leaves its work as dirty state — removing the worktree would destroy it.
+  if [ -n "$(git -C "$worktree" status --porcelain)" ]; then
+    echo "delegate: no commits on $branch but the worktree is DIRTY — worker edited without committing. Leaving the worktree for the orchestrator (commit there, then re-run with --existing)." >&2
+    exit 43
+  else
+    echo "delegate: no commits on $branch — nothing to land." >&2
+    cleanup_worktree; exit 0
+  fi
 fi
 
 # The /code-review pass runs headless via claude -p: the code-review skill is
