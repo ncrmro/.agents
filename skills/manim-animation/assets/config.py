@@ -20,8 +20,13 @@ DIM = "#6c757d"  # decorative only — never for text the viewer must read
 # --- Typography --------------------------------------------------------------
 # Manim's default serif font triggers a Pango kerning bug that misaligns
 # letters. Every Text() must go through Txt() or pass font= explicitly.
+#
+# Pick a font that is actually installed — Manim falls back silently, which
+# brings the kerning bug straight back. Check before choosing:
+#     fc-list : family | tr ',' '\n' | sort -u | grep -i sans
+# DejaVu Sans is present on most Linux hosts and renders cleanly.
 
-FONT = "Helvetica Neue"
+FONT = "DejaVu Sans"
 
 
 def Txt(*args, **kwargs):

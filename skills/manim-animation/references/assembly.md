@@ -52,9 +52,13 @@ so something has to bound it.
 
 ## Concatenating
 
-**Use the concat filter, not the concat demuxer.** The file-based demuxer
-(`-f concat -safe 0 -i list.txt`) produces audible clicks and glitches at every
-scene boundary when the streams were encoded separately.
+**Use the concat filter, not the concat demuxer — once audio is involved.** The
+file-based demuxer (`-f concat -safe 0 -i list.txt`) produces audible clicks and
+glitches at every scene boundary when the audio streams were encoded separately.
+
+For a **silent preview cut** the demuxer is correct and preferable: identical
+codecs from one encoder, `-c copy`, no re-encode, near-instant. Use it while
+iterating, and switch to the filter for the narrated render.
 
 ```sh
 ffmpeg -i merged/scene01.mp4 -i merged/scene02.mp4 -i merged/scene03.mp4 \
