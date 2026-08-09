@@ -49,6 +49,23 @@ scripts/gws.py contacts-list artera --max 500
 Gmail queries use normal Gmail search syntax (`from:`, `label:`,
 `newer_than:7d`, `is:unread`).
 
+## Hosted Google MCP servers
+
+The same account powers Google's hosted Workspace MCP servers
+(`gmailmcp.googleapis.com/mcp/v1`, `calendarmcp.googleapis.com/mcp/v1`,
+`people.googleapis.com/mcp/v1`). Requirements: the project's per-product
+MCP APIs enabled and the project registered in the Google Workspace
+Developer Preview Program (see the setup runbook). The layered
+`~/.agents/mcp.json` entries authenticate with a header that expands
+`${GOOGLE_WORKSPACE_TOKEN}`; mint the value at launch:
+
+```sh
+GOOGLE_WORKSPACE_TOKEN=$(scripts/gws.py token artera) claude ...
+```
+
+Access tokens live about one hour; long sessions must re-launch or
+re-auth. `scripts/gws.py token <account>` always refreshes when needed.
+
 ## Sync conventions
 
 When syncing into a vault or project wiki:

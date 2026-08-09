@@ -10,15 +10,24 @@
     },
     "google-gmail": {
       "type": "http",
-      "url": "https://gmailmcp.googleapis.com/mcp/v1"
+      "url": "https://gmailmcp.googleapis.com/mcp/v1",
+      "headers": {
+        "Authorization": "Bearer ${GOOGLE_WORKSPACE_TOKEN}"
+      }
     },
     "google-calendar": {
       "type": "http",
-      "url": "https://calendarmcp.googleapis.com/mcp/v1"
+      "url": "https://calendarmcp.googleapis.com/mcp/v1",
+      "headers": {
+        "Authorization": "Bearer ${GOOGLE_WORKSPACE_TOKEN}"
+      }
     },
     "google-contacts": {
       "type": "http",
-      "url": "https://people.googleapis.com/mcp/v1"
+      "url": "https://people.googleapis.com/mcp/v1",
+      "headers": {
+        "Authorization": "Bearer ${GOOGLE_WORKSPACE_TOKEN}"
+      }
     },
     "playwright": {
       "type": "stdio",

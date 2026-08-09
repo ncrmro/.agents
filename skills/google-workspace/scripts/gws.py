@@ -97,6 +97,12 @@ def cmd_auth(args) -> None:
     print(f"stored credentials at {token_path}", file=sys.stderr)
 
 
+def cmd_token(args) -> None:
+    """Print a fresh OAuth2 access token for MCP Authorization headers."""
+    creds = load_creds(args.account)
+    print(creds.token)
+
+
 def cmd_accounts(_args) -> None:
     accounts = []
     if CONFIG_ROOT.exists():
@@ -279,6 +285,10 @@ def main() -> None:
     sp = sub.add_parser("auth", help="run one-time browser OAuth consent for an account")
     sp.add_argument("account")
     sp.set_defaults(fn=cmd_auth)
+
+    sp = sub.add_parser("token", help="print a fresh access token (for MCP Authorization headers)")
+    sp.add_argument("account")
+    sp.set_defaults(fn=cmd_token)
 
     sp = sub.add_parser("accounts", help="list configured accounts")
     sp.set_defaults(fn=cmd_accounts)
