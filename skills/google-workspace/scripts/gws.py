@@ -82,7 +82,15 @@ def cmd_auth(args) -> None:
             "(see the google-workspace skill setup reference)."
         )
     flow = InstalledAppFlow.from_client_secrets_file(str(secret), SCOPES)
-    creds = flow.run_local_server(port=0, open_browser=True)
+    # open_browser is off so the flow prints the consent URL instead of trying to
+    # launch a GUI browser, which fails on a headless or browserless workstation
+    # ("could not locate runnable browser"). Open the printed URL in any browser
+    # on THIS machine — the redirect targets localhost, where the local server waits.
+    creds = flow.run_local_server(
+        port=0,
+        open_browser=False,
+        authorization_prompt_message="Open this URL in a browser on this machine to authorize:\n\n{url}\n",
+    )
     token_path = adir / "token.json"
     token_path.write_text(creds.to_json())
     token_path.chmod(0o600)
