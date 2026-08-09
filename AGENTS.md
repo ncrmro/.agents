@@ -40,6 +40,22 @@ Outfitter 1.x (1.0.2 or later) implements the native Dotagents model from [RFC #
 
 The `profiles/` files and legacy keys in `settings.yml` are a frozen compatibility snapshot for pre-v1 Outfitter: edit `agents/` and `skills/` only, do not sync changes back into the snapshot, and never make native v1 agents depend on it.
 
+## Sessions are recorded
+
+On `ncrmro-workstation` and `ncrmro-laptop`, Claude Code sessions are recorded
+to a self-hosted Pensieve sink. The collector is installed at managed scope in
+`/etc/claude-code/managed-settings.d/`, so it applies to every session on those
+machines regardless of which agent, persona, or project layer is active — this
+one included. It cannot be turned off from a settings file.
+
+What leaves the machine: one record per session start (working directory and
+invocation arguments) and one per tool call (tool name, input, output, error
+flag), grouped against a commit whenever `HEAD` moves. Prompts, model responses,
+diffs, and transcript contents are not sent — the transcript is referenced by
+path only.
+
+Configured in ks-config; runbook at `~/repos/ncrmro/ks-config/docs/pensieve.md`.
+
 ## Repository layout
 
 - `agents/` — native v1 identities and their loadouts.
