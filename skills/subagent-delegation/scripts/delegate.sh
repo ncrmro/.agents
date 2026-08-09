@@ -138,12 +138,20 @@ fi
 gate_status=0
 (
   cd "$worktree"
+  # A gate agent may leave its fixes uncommitted; commit them here so the
+  # HEAD-moved convergence test sees them and the land step includes them.
+  commit_gate_fixes() {
+    [ -n "$(git status --porcelain)" ] || return 0
+    git add -A && git commit -m "$1"
+  }
   echo "delegate: /simplify" >&2
   claude -p "/simplify" "${claude_auto[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
+  commit_gate_fixes "refactor: simplify per review"
   for pass in 1 2 3; do
     before="$(git rev-parse HEAD)"
     echo "delegate: /code-review (pass $pass)" >&2
     claude -p "/code-review" "${claude_auto[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
+    commit_gate_fixes "fix: apply code-review findings"
     [ "$(git rev-parse HEAD)" = "$before" ] && exit 0
   done
   exit 42   # still churning after 3 passes
