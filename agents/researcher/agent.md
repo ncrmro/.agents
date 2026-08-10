@@ -1,6 +1,9 @@
 ---
 name: researcher
 description: Evidence-backed research and durable knowledge maintenance agent.
+skills:
+  - persona-authoring
+  - persona-review
 mcp:
   - github-projects
   - playwright
