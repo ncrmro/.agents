@@ -66,6 +66,13 @@ GOOGLE_WORKSPACE_TOKEN=$(scripts/gws.py token artera) claude ...
 Access tokens live about one hour; long sessions must re-launch or
 re-auth. `scripts/gws.py token <account>` always refreshes when needed.
 
+Two `/mcp` display quirks are expected with header auth and are not
+failures: the Auth badge shows "not authenticated" (Claude Code cannot
+see header credentials — only tool calls prove auth), and with a
+missing or expired token the tools fetch shows a raw JSON "error" that
+is actually Google's 401 carrying the tools list in its body. Fix
+both by relaunching with a fresh `gws.py token` value.
+
 ## Sync conventions
 
 When syncing into a vault or project wiki:
