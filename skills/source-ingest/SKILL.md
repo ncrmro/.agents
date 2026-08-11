@@ -103,6 +103,99 @@ required by the consuming project.
 
 The first conversion downloads layout/OCR models and may take several minutes.
 
+## Docling GPU acceleration
+
+**Never run a large Docling batch until a runtime probe positively proves
+`torch.cuda.is_available()` is `True`.** Docling has no CLI device flag;
+device selection is the `DOCLING_DEVICE` environment variable (`auto`, `cpu`,
+`cuda`, `cuda:N`, `mps`, `xpu`). Setting `DOCLING_DEVICE=cuda` fails closed —
+Docling raises instead of silently falling back to CPU — so prefer it over
+`auto` once GPU is proven.
+
+Verified working on this machine: AMD Radeon RX 9070 XT (RDNA4, gfx1201, ROCm
+7.2.3). ROCm-built PyTorch exposes AMD GPUs through the same `torch.cuda` API
+CUDA uses (HIP aliases as CUDA for compatibility), so `DOCLING_DEVICE=cuda`
+also selects the ROCm-backed AMD GPU — this is expected, not a bug.
+
+### Recipe (ROCm / AMD, RDNA4)
+
+1. Install `rocminfo`/`rocm-smi` into the user Nix profile (never a project
+   devenv — same rule as the whisper.cpp Vulkan build) to preflight-check the
+   card before touching Docling:
+
+   ```bash
+   nix profile add nixpkgs#rocmPackages.clr nixpkgs#rocmPackages.rocm-smi
+   ```
+
+   ```bash
+   rocm-smi          # lists the device
+   rocminfo | grep -E "Name:|Marketing"   # look for gfx1201 / your gpuTargets code
+   ```
+
+   ROCm 7.2 added native gfx1200/gfx1201 (RDNA4) support — no
+   `HSA_OVERRIDE_GFX_VERSION` workaround needed on this generation. If
+   `rocminfo` doesn't list the GPU, the card is unsupported by the installed
+   ROCm version; do not proceed to the pip step until it does.
+
+   The PyTorch ROCm wheel (step 2) vendors its own ROCm runtime libraries
+   inside `torch/lib` — that's most of its multi-GB size. Once it's
+   installed, `torch.cuda.is_available()` works without `LD_LIBRARY_PATH`
+   pointing at the Nix profile at all; a wider `rocmPackages.*` install
+   (hipblas, miopen, rocblas, rocfft, rccl, …) is not load-bearing for
+   Docling and was not needed here. Install those extra packages only if a
+   specific missing-library error names one.
+
+2. Replace Docling's CUDA-build torch/torchvision with the matching ROCm
+   wheels, in its `uv tool` venv. Pin the ROCm minor version pytorch.org
+   publishes closest to `rocmPackages.clr.version` (check with `nix eval
+   nixpkgs#rocmPackages.clr.version`); match the torch/torchvision version
+   pair exactly, or `import torchvision` raises `RuntimeError: operator
+   torchvision::nms does not exist` (ABI mismatch, not a ROCm problem):
+
+   ```bash
+   uv pip install --python ~/.local/share/uv/tools/docling/bin/python \
+     "torch==2.13.0+rocm7.2" "torchvision==0.28.0+rocm7.2" \
+     --index-url https://download.pytorch.org/whl/rocm7.2
+   ```
+
+3. Run Docling with the Nix profile libraries on `LD_LIBRARY_PATH` — still
+   needed for Docling's own `libxcb`/`libGL` dependencies, same as the CPU
+   recipe above, even though the ROCm wheel no longer needs it — and
+   `DOCLING_DEVICE=cuda` so a broken GPU path fails loudly instead of
+   silently falling back to CPU:
+
+   ```bash
+   LD_LIBRARY_PATH="$HOME/.nix-profile/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+     PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH" \
+     DOCLING_DEVICE=cuda \
+     docling <source.pdf> --to md --output <output-directory> \
+     --image-export-mode placeholder --verbose
+   ```
+
+4. Verify with a positive probe before trusting any conversion — don't trust
+   silent success. `LD_LIBRARY_PATH` is not required for this probe (the
+   ROCm wheel is self-contained), but is harmless to include for parity with
+   the actual Docling invocation:
+
+   ```bash
+   ~/.local/share/uv/tools/docling/bin/python -c "
+   import torch
+   assert torch.cuda.is_available()
+   print(torch.cuda.get_device_name(0), torch.cuda.get_device_properties(0).gcnArchName)"
+   ```
+
+   Expect `AMD Radeon Graphics gfx1201` (torch reports the generic marketing
+   string for ROCm cards; `gcnArchName` is the field that actually identifies
+   the silicon). In the `--verbose` conversion log, confirm
+   `docling.utils.accelerator_utils: Accelerator device: 'cuda:0'` and
+   RapidOCR's `Using GPU device with ID: 0` — both appear per-model-load, so
+   look for them near the top of the run, not just once.
+
+Fallback: if the ROCm wheel install or `rocminfo` doesn't produce a positive
+probe, just set `DOCLING_DEVICE=cpu` (or unset it). The ROCm torch build runs
+fine on CPU too — no need to reinstall the CUDA-build torch — so CPU-only
+remains the prior working state and an acceptable outcome.
+
 ## Wiki handoff
 
 When the destination is a durable wiki, also use its `wiki` skill. The wiki

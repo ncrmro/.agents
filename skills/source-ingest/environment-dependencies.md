@@ -38,6 +38,8 @@ profile to `PATH`, so a project devenv cannot silently select a CPU build.
 | RADV prints a conformance warning | Mesa RADV identifies itself as non-conformant | Treat the positive device/backend marker as GPU evidence; preserve the log. |
 | Docling raises `libxcb.so.1` / `libGL.so` | manylinux wheel cannot see Nix libraries | Run with the user profile `lib` directory in `LD_LIBRARY_PATH`. |
 | `ggml-*.bin` is missing | Model setup was skipped | Run setup; use `--large-model` only when needed. |
+| Docling `import torchvision` raises `RuntimeError: operator torchvision::nms does not exist` | torch and torchvision were reinstalled at mismatched versions/backends (e.g. ROCm torch + CUDA-build torchvision) | Reinstall torchvision at the exact version matching torch's build tag, from the same wheel index. |
+| `DOCLING_DEVICE=cuda` raises `CUDA is not available` on an AMD box | ROCm runtime libraries missing from `LD_LIBRARY_PATH`, or torch is still the CUDA (not ROCm) build | Confirm `rocminfo` sees the card, confirm `~/.nix-profile/lib` is on `LD_LIBRARY_PATH`, confirm `python -c "import torch; print(torch.__version__)"` reports a `+rocmX.Y` suffix — see "Docling GPU acceleration" in SKILL.md. |
 
 ## Models
 
