@@ -202,6 +202,24 @@ first-use expansion in other notes.
 When an acronym entry is added, renamed, or removed, update the acronym page,
 its `updated` date, and the append-only wiki log in the same change.
 
+### Style basis
+
+No universal wiki standard governs acronyms. This convention adapts common
+practice from these maintained style guides:
+
+- [Wikipedia Manual of Style — Abbreviations](https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style/Abbreviations)
+  requires first-use expansion for most acronyms, recommends sourceable
+  abbreviations, and requires consistent usage within a page.
+- [Wikipedia — Redirect](https://en.wikipedia.org/wiki/Wikipedia:Redirect)
+  supports redirects from unambiguous abbreviations and disambiguation when an
+  abbreviation has multiple meanings.
+- [Google developer documentation style — Abbreviations](https://developers.google.com/style/abbreviations)
+  spells out unfamiliar abbreviations on first reference, uses the abbreviation
+  alone afterward, and permits audience-based exceptions for familiar terms.
+
+These references support the pattern. The rules above are the operational
+contract for wikis that use this skill.
+
 ## Tagging conventions
 
 Use hierarchical tags in lowercase kebab-case, `namespace/value`:
