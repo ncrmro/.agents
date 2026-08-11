@@ -160,6 +160,48 @@ source_kind: paper
 role: researcher      # person notes
 ```
 
+## Acronyms and abbreviations
+
+Treat each wiki note as a standalone entry point. A reader must not have to
+open a glossary before they can understand a note.
+
+- Spell out a specialized acronym on first use in each note, followed by the
+  acronym in parentheses: `Master Equipment List (MEL)`. Use the acronym alone
+  after that.
+- If the first use is in a title or heading, spell it out in the first body
+  paragraph.
+- Do not invent an acronym or infer its expansion. Use the form established by
+  an authoritative source or by the project. Preserve source wording in
+  quotations and extracted source text.
+- Prefer the full term for the canonical concept-note title when the acronym is
+  specialized or ambiguous. A term that is overwhelmingly known by its acronym
+  may use that acronym as its title.
+- Link acronym text to the canonical note with a display alias, such as
+  `[[Master Equipment List|MEL]]`. If the wiki engine and its link checker both
+  support frontmatter aliases, an unambiguous acronym may also be an `aliases:`
+  value. Do not make an ambiguous acronym an alias.
+- Form plurals without an apostrophe: `MELs`, not `MEL's`.
+
+A wiki may maintain `wiki/acronyms.md` as a searchable reference page. Use
+`type: reference` and `status: active`. Add it to `wiki/index.md`. The page
+should contain a compact table:
+
+```md
+| Acronym | Expansion | Meaning or scope | Canonical note |
+| --- | --- | --- | --- |
+| MEL | Master Equipment List | Spacecraft mass control | [[Master Equipment List]] |
+```
+
+Add an entry when a specialized acronym recurs across notes or is a likely
+search term. If one acronym has multiple meanings, add one qualified row for
+each meaning and do not select a silent default. The acronym page is an index,
+not the definition authority. The canonical concept or source note owns the
+definition, evidence, and limitations. The acronym page does not replace
+first-use expansion in other notes.
+
+When an acronym entry is added, renamed, or removed, update the acronym page,
+its `updated` date, and the append-only wiki log in the same change.
+
 ## Tagging conventions
 
 Use hierarchical tags in lowercase kebab-case, `namespace/value`:
@@ -285,3 +327,5 @@ When working in the wiki:
 12. Avoid new folders or taxonomy levels unless the existing structure has become difficult to use.
 13. Keep `wiki/index.md` current when notes are added, renamed, or removed.
 14. Append every meaningful change to `wiki/log.md`; never rewrite its history.
+15. Expand specialized acronyms on first use and keep `wiki/acronyms.md` in
+    sync when the wiki has one.
