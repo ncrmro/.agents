@@ -56,6 +56,19 @@ or use `--api-key-file`. `ELEVENLABS_API_KEY` takes precedence when it is set.
 Do not type the key as a command argument. Set `ELEVENLABS_VOICE_ID`, or pass
 the non-secret voice ID with `--voice-id`.
 
+The canonical credential is the `elevenlabs-api-key` field in
+`~/repos/ncrmro/ks-config/secrets/shared.yaml`. SOPS encrypts this file. Do not
+copy the decrypted value into this skill, a project repository, a manifest, or
+shell history. If `/run/secrets/elevenlabs-api-key` is absent, the user MAY
+decrypt only that field into a permission-restricted temporary file. The user
+MUST complete every YubiKey PIN and touch action. Pass the temporary file with
+`--api-key-file`, and remove it after the render.
+
+Before a multi-scene render, query `/v1/user/subscription` and compare
+`character_count` with `character_limit`. Stop before generation if the
+remaining quota cannot contain the approved script. An HTTP 402 response means
+the render did not produce usable narration.
+
 Get user approval for the request. Then run:
 
 ```bash
