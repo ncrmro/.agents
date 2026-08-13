@@ -11,9 +11,9 @@
 # ── GATES — this workflow is workflow_dispatch-only until all clear ─────────
 # 1. Ocean runs the aioutfitter.com operator (the migration landed).
 # 2. The mirror repository exists on git.ncrmro.com and syncs from GitHub.
-# 3. ks-config's ncrmro-agents-catalog-forgejo-deploy-rbac.yaml is applied
-#    (a ks-dev deploy — YubiKey-approved); the OIDC subject embeds this
-#    repository and workflow path.
+# 3. The trust in deploy/rbac.yaml is admin-applied
+#    (kubectl apply --server-side -f deploy/rbac.yaml); the OIDC subject
+#    embeds this repository and workflow path.
 # Flip `on:` to the push trigger below once all hold.
 #
 # on:
