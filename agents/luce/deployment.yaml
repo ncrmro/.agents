@@ -79,6 +79,10 @@ spec:
   profile:
     agent: luce
     harness: pi
+  # The image every ocean agent runs today, pinned explicitly so the
+  # operator's --agent-image default (a dev tag) can never select for a
+  # production agent. Upgrading the runtime is a deliberate digest bump here.
+  image: ghcr.io/ai-outfitter/link-agent@sha256:99c71c2ff429f1960bc2430edb1f084db5f2f1f2573496bff659acc8f9d4e612
   # Chrome DevTools sidecar: headless Chrome serving CDP on 127.0.0.1:9222,
   # pod-local only. The agent container reaches it as AGENT_BROWSER_CDP_URL
   # and carries chrome-devtools-mcp in its image to attach.
