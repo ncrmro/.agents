@@ -1,0 +1,81 @@
+# Deploys every resident agent this catalog declares to ocean when the
+# catalog changes. The tree decides what deploys: each
+# agents/<id>/deployment.yaml is one agent, and the deploy-catalog action
+# globs exactly that path.
+#
+# This repository is canonical on GitHub (ncrmro/.agents) and mirrored into
+# git.ncrmro.com, where this workflow runs — GitHub-hosted runners cannot
+# reach ocean, and the mirror gives the same Forgejo Actions OIDC identity
+# every other catalog uses.
+#
+# ── GATES — this workflow is workflow_dispatch-only until all clear ─────────
+# 1. Ocean runs the aioutfitter.com operator (the migration landed).
+# 2. The mirror repository exists on git.ncrmro.com and syncs from GitHub.
+# 3. ks-config's ncrmro-agents-catalog-forgejo-deploy-rbac.yaml is applied
+#    (a ks-dev deploy — YubiKey-approved); the OIDC subject embeds this
+#    repository and workflow path.
+# Flip `on:` to the push trigger below once all hold.
+#
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - agents/**
+#       - skills/**
+#       - .forgejo/workflows/deploy.yml
+name: deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy the catalog revision to ocean
+    # `native` runs on the ocean host, where the runner's instance URL is
+    # Forgejo itself and the Kubernetes API is local — the docker-backed
+    # labels can reach neither.
+    runs-on: native
+    enable-openid-connect: true
+    timeout-minutes: 30
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      # Identity: Forgejo Actions OIDC straight to the Kubernetes API — no
+      # kubeconfig secret, no stored cluster credential. The action asserts
+      # what this identity can and cannot do; establishing it is this step's
+      # job. jq is required by the action and used here too.
+      - name: Point kubectl at ocean as the deploy identity
+        env:
+          KUBE_SERVER: https://100.64.0.6:6443
+          KUBE_OIDC_AUDIENCE: kubernetes-ocean
+        run: |
+          set -euo pipefail
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Forgejo Actions OIDC request URL is unavailable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Forgejo Actions OIDC request token is unavailable}"
+          oidc_token="$(
+            curl --fail --silent --show-error \
+              --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${KUBE_OIDC_AUDIENCE}" | jq -er .value
+          )"
+          kubeconfig="${RUNNER_TEMP:-/tmp}/deploy-kubeconfig"
+          touch "$kubeconfig" && chmod 0600 "$kubeconfig"
+          export KUBECONFIG="$kubeconfig"
+          kubectl config set-cluster ocean \
+            --server="$KUBE_SERVER" \
+            --certificate-authority="$PWD/.forgejo/ocean-server-ca.crt" \
+            --embed-certs >/dev/null
+          kubectl config set-credentials deploy --token="$oidc_token" >/dev/null
+          kubectl config set-context ocean --cluster=ocean --user=deploy >/dev/null
+          kubectl config use-context ocean >/dev/null
+          echo "KUBECONFIG=$kubeconfig" >> "$GITHUB_ENV"
+
+      # Exact-SHA pin, updated deliberately: the action patches custom
+      # resources whose API group already changed once, so the deploy step
+      # and the CRDs it patches move as one bump. Fully qualified because a
+      # bare `uses:` resolves against the Forgejo instance, not github.com.
+      - name: Deploy the catalog revision
+        uses: https://github.com/ai-outfitter/agent-operator/actions/deploy-catalog@b4228496b6b3dfd26b98c68e49c433f5d631b0c1
+        with:
+          revision: ${{ github.sha }}
+          catalog-source: ncrmro-agents
+          field-manager: agents-catalog-deploy
