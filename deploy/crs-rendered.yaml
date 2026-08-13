@@ -1,0 +1,327 @@
+---
+# Luce: the triage and review agent — the ncrmro org's resident, deployed
+# from this catalog (its profile lives beside this file).
+#
+# Organization/ncrmro is declared HERE now, not in ks.systems/.agents: one
+# organization per catalog, declared in the catalog that deploys its agents.
+# ks.systems/.agents declares Organization/ks-systems for vega and drago.
+#
+# Bootstrap (namespace, secrets, PVC seed) is admin-only because CI can
+# neither create objects nor read Secrets. Once luce exists, CI owns its
+# catalog revision: pushes to main patch Organization/ncrmro and Agent/luce
+# together, so profile and pin move as one.
+#
+# Luce is a relay CLIENT. The relay server runs in agent-vega's pi process and
+# is reached at the NodePort URL in the luce-agent-session secret; nothing here
+# starts a listener, and luce has no Service.
+apiVersion: aioutfitter.com/v1alpha1
+kind: Organization
+metadata:
+  name: ncrmro
+spec:
+  displayName: ncrmro
+  agentCatalogs:
+    - name: ncrmro-agents
+      github: ncrmro/.agents
+      revision: f3fc249d0007442a15446418b07eb533c5c5fb59
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: luce-runtime
+  namespace: agent-luce
+data:
+  # forgejo remains luce's primary wake path — it starts work because a review
+  # was requested or an issue assigned. jmap adds a mailbox so a human can
+  # reach it directly. Listing a channel whose credentials are absent is safe:
+  # the extension logs "configuration is incomplete; skipping" and carries on,
+  # so this stays inert until the luce-email secret exists.
+  # chatto puts it in the shared Chatto room, so a human can ask it a question
+  # in chat.
+  OUTFITTER_CHANNELS: jmap,agent,forgejo,chatto
+  LINK_MAIL_PROCESSED: Processed
+  # Matches Link's stable runtime identity projected into the agent workload.
+  AGENT_ENDPOINT_ID: link:luce
+  AGENT_PRINCIPAL_ID: link:luce
+  GIT_ASKPASS: /workspace/.link/forgejo-askpass
+  GIT_TERMINAL_PROMPT: "0"
+  # Install the profile-pinned Channels revision once from the registry into
+  # the workspace cache instead of using the image's stale offline cache.
+  # TODO(upstream-channels): return to PI_OFFLINE=1 once the Link image
+  # prebuilds a Channels release containing the relay.
+  PI_OFFLINE: "0"
+  XDG_CACHE_HOME: /workspace/.cache
+  # Pod-reachable Forgejo: the public hostname is blocked from the pod CIDR
+  # by the ingress allowlist, so CLI logins target the in-cluster service.
+  FORGEJO_INTERNAL_URL: http://host-forgejo.default.svc.cluster.local:3001
+  # Same address for the notification poller. FORGEJO_URL stays public so the
+  # links the agent reads and writes remain the ones a human can open.
+  FORGEJO_API_URL: http://host-forgejo.default.svc.cluster.local:3001
+  FORGEJO_NOTIFY_FILTERS: review_requested,assigned_issue,assigned_pr
+  # The channel must NOT mark threads read: it would clear the notification in
+  # the same poll that emits the wake, so the agent's own turn queries
+  # /notifications and finds nothing — the wake racing its own evidence. The
+  # agent marks a thread read once it has acted on it (forge-collaboration).
+  FORGEJO_NOTIFY_MARK_READ: "0"
+---
+# Belongs to Organization/ncrmro, declared above in this same file. The
+# revision is pinned twice on purpose: the Organization pin is what Outfitter
+# resolves, and the copy in the setup script below lives in the pod template,
+# so the pod must roll for a new revision to take effect. An agent CI could
+# not patch would silently keep running an old profile while the Organization
+# moved on.
+apiVersion: aioutfitter.com/v1alpha1
+kind: Agent
+metadata:
+  name: luce
+spec:
+  memberships:
+    - organization: ncrmro
+  profile:
+    agent: luce
+    harness: pi
+  # The image every ocean agent runs today, pinned explicitly so the
+  # operator's --agent-image default (a dev tag) can never select for a
+  # production agent. Upgrading the runtime is a deliberate digest bump here.
+  image: ghcr.io/ai-outfitter/link-agent@sha256:99c71c2ff429f1960bc2430edb1f084db5f2f1f2573496bff659acc8f9d4e612
+  # Chrome DevTools sidecar: headless Chrome serving CDP on 127.0.0.1:9222,
+  # pod-local only. The agent container reaches it as AGENT_BROWSER_CDP_URL
+  # and carries chrome-devtools-mcp in its image to attach.
+  browser:
+    enabled: true
+  credentials:
+    # Provisioned 2026-08-02 by `bin/onboard-agent luce`, which creates the
+    # Stalwart principal and this Secret together. It carries
+    # XIN_BASE_URL/XIN_BASIC_USER/XIN_BASIC_PASS and the EMAIL_* spelling of the
+    # same three values, and is an administrator's job: CI is denied Secrets
+    # entirely. As with drago, the username is the Stalwart login `agent-luce`,
+    # not the agent name — that account owns luce@ncrmro.com, and
+    # authenticating as `luce` authenticates as nobody.
+    #
+    # This reference must never land before the Secret exists: the operator
+    # holds CredentialsReady false while a referenced credential is missing,
+    # which holds Ready false, which fails the deploy's convergence check.
+    - secret: luce-email
+      as: env
+    - secret: luce-agent-session
+      as: env
+    # Forge CLI credentials: FORGEJO_URL/FORGEJO_TOKEN (tea; GITEA_TOKEN
+    # mirror) and GITHUB_TOKEN/GH_TOKEN for gh-compatible tooling. Luce's own
+    # bot token — never vega's.
+    - secret: luce-forge-auth
+      as: env
+    # CHATTO_BASE_URL/CHATTO_TOKEN/CHATTO_ROOM_IDS. The token is an opaque
+    # login credential on a 90-day sliding TTL — Chatto has no personal access
+    # token — so it renews itself while the agent stays connected. Same
+    # ordering rule as the mailbox: this reference must not land before the
+    # Secret exists.
+    - secret: luce-chatto
+      as: env
+    - configMap: luce-runtime
+      as: env
+    # Created only after local Pi/OpenAI auth is copied directly into the PVC.
+    - configMap: luce-pi-ready
+      as: env
+  setup:
+    - name: catalog-bootstrap
+      script: |
+        set -eu
+        # Clones the catalog as this agent's own bot identity, reusing the token
+        # in luce-forge-auth. The agents team has read on every ks.systems
+        # repository, so no separate catalog credential exists to expire.
+        : "${FORGEJO_USER:?luce-forge-auth must provide FORGEJO_USER}"
+        : "${FORGEJO_TOKEN:?luce-forge-auth must provide FORGEJO_TOKEN}"
+
+        install -d -m 0700 /workspace/.link
+        cat > "$GIT_ASKPASS" <<'EOF'
+        #!/bin/sh
+        case "$1" in
+          *Username*) printf '%s\n' "$FORGEJO_USER" ;;
+          *Password*) printf '%s\n' "$FORGEJO_TOKEN" ;;
+          *) exit 1 ;;
+        esac
+        EOF
+        chmod 0700 "$GIT_ASKPASS"
+
+        source_uri="git+https://github.com/ncrmro/.agents.git"
+        repository="${source_uri#git+}"
+        revision="f3fc249d0007442a15446418b07eb533c5c5fb59"
+        cache_key="$(
+          node -e \
+            'process.stdout.write(Buffer.from(`${process.argv[1]}#${process.argv[2]}`).toString("base64url"))' \
+            "$source_uri" "$revision"
+        )"
+        catalog="/workspace/.agents-cache/repos/$cache_key"
+        temporary="${catalog}.tmp.$$"
+        stale="${catalog}.stale.$$"
+        trap 'rm -rf "$temporary" "$stale"' EXIT
+
+        rm -rf "$temporary"
+        mkdir -p "$temporary"
+        git -C "$temporary" init --quiet
+        git -C "$temporary" remote add origin "$repository"
+        git -C "$temporary" fetch --quiet --depth 1 origin "$revision"
+        git -C "$temporary" checkout --quiet --detach FETCH_HEAD
+        test "$(git -C "$temporary" rev-parse HEAD)" = "$revision"
+        test -f "$temporary/agents/luce/agent.md"
+
+        if [ -e "$catalog" ]; then
+          mv "$catalog" "$stale"
+        fi
+        mv "$temporary" "$catalog"
+        rm -rf "$stale"
+        # Outfitter's git extension cache is revision-blind: an existing
+        # cached checkout wins regardless of the profile pin. Drop the cache
+        # when it no longer matches the pin in the freshly fetched catalog.
+        pin=""
+        while IFS= read -r line; do
+          case "$line" in
+            *git:github.com/ai-outfitter/channels@*)
+              pin="${line##*channels@}"
+              pin="${pin%%[!0-9a-f]*}"
+              break
+              ;;
+          esac
+        done < "$catalog/agents/luce/agent.md"
+        cached="/workspace/.cache/outfitter/pi-extensions/git/github.com/ai-outfitter/channels"
+        # Drop the cache when the checkout is at the wrong revision, and also
+        # when its dependencies are missing. Outfitter skips installation
+        # whenever a checkout exists, so a clone that completed while its
+        # `npm install` did not leaves a directory at the right revision with no
+        # node_modules — the extension then fails to load on every boot, and no
+        # restart repairs it. Checking the revision alone cannot see that.
+        # Drop the cache unless it is both at the pinned revision and fully
+        # installed. Outfitter shallow-clones the extension's default branch and
+        # then checks out the pin, so a pin that is not that branch's tip is
+        # absent from the clone: the checkout fails, no `npm install` runs, and
+        # the directory is left at the wrong revision with no node_modules.
+        # Outfitter treats any existing directory as a valid cache, so nothing
+        # repairs that on its own. Removing it here at least makes each boot
+        # retry the install rather than fail identically forever.
+        if [ -d "$cached" ]; then
+          current="$(git -C "$cached" rev-parse HEAD 2>/dev/null || echo unknown)"
+          if [ -z "$pin" ] || [ "$current" != "$pin" ] || [ ! -d "$cached/node_modules" ]; then
+            rm -rf "$cached"
+          fi
+        fi
+        # Materialise the extension here rather than leaving it to Outfitter.
+        # Two behaviours make that necessary. Outfitter shallow-clones the
+        # extension's default branch and then checks out the pin, so a pin that
+        # is not that branch's tip is missing from the clone and the checkout
+        # fails. And it treats any existing directory as installed, so it does
+        # not run `npm install` for a checkout it did not create — leaving the
+        # relay channel unable to load with `Cannot find module 'undici'`, on
+        # every boot, unrepaired by restart. Fetching the exact commit works for
+        # any pin, and installing here means the cache is either complete or
+        # absent.
+        if [ -n "$pin" ] && [ ! -d "$cached" ]; then
+          if mkdir -p "$cached" &&
+            git -C "$cached" init --quiet &&
+            git -C "$cached" remote add origin https://github.com/ai-outfitter/channels.git &&
+            git -C "$cached" fetch --quiet --depth 1 origin "$pin" &&
+            git -C "$cached" checkout --quiet FETCH_HEAD &&
+            (cd "$cached" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1)
+          then
+            echo "catalog-bootstrap: installed channels at $pin"
+          else
+            # Leave nothing half-built: a partial cache is what Outfitter would
+            # then accept as complete.
+            echo "catalog-bootstrap: could not install channels at $pin" >&2
+            rm -rf "$cached"
+          fi
+        fi
+    - name: forge-cli-bootstrap
+      script: |
+        set -u
+        export HOME=/workspace
+        # gh reads GH_TOKEN/GITHUB_TOKEN from env directly; tea and fj need
+        # a written login. Logins target the pod-reachable Forgejo URL. Every
+        # step is best-effort: forge CLI auth must never block the agent.
+        url="${FORGEJO_INTERNAL_URL:-${FORGEJO_URL:-}}"
+        if [ -n "${FORGEJO_TOKEN:-}" ] && [ -n "$url" ]; then
+          insecure=""
+          case "$url" in http://*) insecure="--insecure" ;; esac
+          if command -v tea >/dev/null 2>&1; then
+            # Rewrite the login every boot so token rotation takes effect.
+            rm -f "$HOME/.config/tea/config.yml"
+            tea login add --name forgejo --url "$url" $insecure \
+              --token "$FORGEJO_TOKEN" >/dev/null 2>&1 ||
+              echo "forge-cli-bootstrap: tea login failed (continuing)" >&2
+            # `login add` does not mark the login default, so every later tea
+            # call prints "no gitea login detected, falling back to login
+            # 'forgejo'" on stderr — noise that lands in the agent's tool
+            # output and reads like a broken credential. It also makes the
+            # choice arbitrary the moment a second login exists.
+            tea logins default forgejo >/dev/null 2>&1 ||
+              echo "forge-cli-bootstrap: tea default login failed (continuing)" >&2
+          fi
+          # fj: write keys.json directly (`fj auth add-key` mis-parses a
+          # positional user plus stdin key). Invoke as `fj -H $url ...`.
+          host="${url#https://}"
+          host="${host#http://}"
+          FJ_HOST="$host" node -e '
+            const fs = require("fs");
+            const os = require("os");
+            const dir = os.homedir() + "/.local/share/forgejo-cli";
+            fs.mkdirSync(dir, { recursive: true });
+            const path = dir + "/keys.json";
+            let keys = { hosts: {}, aliases: {}, default_ssh: [] };
+            try { keys = JSON.parse(fs.readFileSync(path, "utf8")); } catch {}
+            keys.hosts[process.env.FJ_HOST] = {
+              type: "Application",
+              token: process.env.FORGEJO_TOKEN,
+            };
+            fs.writeFileSync(path, JSON.stringify(keys, null, 1));
+            fs.chmodSync(path, 0o600);
+          ' 2>&1 || echo "forge-cli-bootstrap: fj key write failed (continuing)" >&2
+        fi
+        exit 0
+    - name: mail-bootstrap
+      script: |
+        set -eu
+        # Bounded, unlike an agent whose mailbox is its only wake path. This
+        # agent is woken by the forge, so mail is an addition rather than a
+        # dependency: if the mailbox is unreachable or its secret is not yet
+        # provisioned, start anyway without it. An unbounded wait here would
+        # hold the pod in init forever and take the agent offline over a
+        # channel it does not need to function.
+        deadline=$(( $(date +%s) + 60 ))
+        while [ "$(date +%s)" -lt "$deadline" ]; do
+          if xin messages search "in:inbox" --max 1 >/dev/null 2>&1; then
+            xin labels create "$LINK_MAIL_PROCESSED" >/dev/null 2>&1 ||
+              xin messages search "in:$LINK_MAIL_PROCESSED" --max 1 >/dev/null 2>&1 ||
+              echo "mail-bootstrap: could not provision $LINK_MAIL_PROCESSED" >&2
+            echo "mail-bootstrap: mailbox ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "mail-bootstrap: no JMAP connectivity after 60s; starting without mail" >&2
+        exit 0
+  workspace:
+    resourceQuota:
+      hard:
+        requests.cpu: "1"
+        requests.memory: 2Gi
+        limits.cpu: "2"
+        limits.memory: 4Gi
+        # 6Gi workspace + the operator's fixed 20Gi nix store. The Agent is
+        # rejected outright if this is under volume.size + 20Gi.
+        requests.storage: 26Gi
+        persistentvolumeclaims: "4"
+        count/pods: "10"
+        count/jobs.batch: "20"
+        count/services: "5"
+        count/configmaps: "20"
+        count/secrets: "10"
+    limitRange:
+      container:
+        defaultRequest:
+          cpu: 100m
+          memory: 256Mi
+        default:
+          cpu: "1"
+          memory: 2Gi
+    volume:
+      size: 6Gi
+      storageClassName: ocean-nvme
