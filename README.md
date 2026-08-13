@@ -22,7 +22,7 @@ Outfitter v1 resolves resources from project `.agents/`, then global `~/.agents/
 
 | Path                                        | Purpose                                                                              |
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `agents/`                                   | Native Outfitter v1 agents (`founder`, `engineer`, `platform`, `researcher`)         |
+| `agents/`                                   | Personal native Outfitter v1 agent definitions                                      |
 | `skills/`                                   | Native v1 skills shared by those agents and consuming projects                       |
 | `settings.yml`                              | v1 defaults and published sources                                                    |
 | `settings.local.yml`                        | Ignored machine-local source overrides (see runbook)                                 |
@@ -45,5 +45,7 @@ Outfitter v1 resolves resources from project `.agents/`, then global `~/.agents/
 ## Upstream sources
 
 - [ai-outfitter/default-profiles](https://github.com/ai-outfitter/default-profiles) — published v1 defaults
+
+The pinned default catalog supplies `founder` and pins its reviewed community catalog.
 
 The frozen legacy profile graph in `settings.yml` also pins community-profiles, Outfitter, and Actions for pre-v1 clients.

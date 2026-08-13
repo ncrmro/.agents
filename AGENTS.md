@@ -26,11 +26,12 @@ Outfitter resolves resources from highest to lowest precedence: project `.agents
 
 Highest precedence first:
 
-| Layer                           | Root                                                | Resources used here                    |
-| ------------------------------- | --------------------------------------------------- | -------------------------------------- |
-| Consuming project               | `<project>/.agents/`                                | Project-specific context and overrides |
-| `ncrmro/.agents`                | This repository                                     | Personal agents and skills             |
-| `ai-outfitter/default-profiles` | Repository root at the ref pinned in `settings.yml` | Published v1 defaults                  |
+| Layer                             | Root                                                | Resources used here                    |
+| --------------------------------- | --------------------------------------------------- | -------------------------------------- |
+| Consuming project                 | `<project>/.agents/`                                | Project-specific context and overrides |
+| `ncrmro/.agents`                  | This repository                                     | Personal agents and skills             |
+| `ai-outfitter/default-profiles`   | Repository root at the ref pinned in `settings.yml` | Published v1 defaults                  |
+| `ai-outfitter/community-profiles` | Transitively pinned by `default-profiles`           | Published community agents and skills  |
 
 `settings.local.yml` may replace `sources` with local checkout paths for live development. Keep machine-specific paths out of committed settings.
 
