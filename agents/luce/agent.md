@@ -1,14 +1,28 @@
 ---
 name: luce
-description: Triage and Review Agent — local personal profile with Google Workspace and browser access
+description: Triage and Review Agent — personal profile and ocean resident, one composition
 skills:
   - keystone-development
   - google-workspace
+  - forge-collaboration
+  - mail
 mcp:
   - chrome-devtools
   - google-gmail
   - google-calendar
   - google-contacts
+extensions:
+  # channels v1.6.1 (A2A task plane) by its release commit: tag v1.6.1 =
+  # 03fb6d2. Pinned by git because the npm publish of 1.6.x is blocked on the
+  # one-time trusted-publisher setup (channels#40). The relay wire protocol is
+  # unversioned, so every deployed profile MUST carry the same version as the
+  # relay server's (vega's). The resident deployment's setup script greps this
+  # exact `git:...channels@<sha>` line to pre-install the extension — keep the
+  # pin on one line.
+  - git:github.com/ai-outfitter/channels@03fb6d22769fb31f1d4f5241b109502f5ab9a848
+# The resident pod needs an explicit model (its Pi auth is seeded on the PVC);
+# locally this is an override you can bypass per-run.
+model: openai-codex/gpt-5.6-luna
 thinking: high
 ---
 

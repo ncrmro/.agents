@@ -1,0 +1,56 @@
+# Deploys this catalog's resident agent (luce, on ocean) when the catalog
+# changes. The tree decides what deploys: each agents/<id>/deployment.yaml is
+# one agent, and the deploy-catalog action globs exactly that path.
+#
+# ── GATES — this workflow is workflow_dispatch-only until both clear ────────
+# 1. Ocean still runs the pre-rename operator (link-operator-system,
+#    link.aioutfitter.com). The manifest here is written for aioutfitter.com,
+#    so the operator migration must land first — the same change-set that
+#    moves Agent/luce's deployment home from ks.systems/.agents to here and
+#    splits Organization/ks-systems out for vega and drago.
+# 2. Identity: this is a GitHub repository deploying to a self-hosted
+#    cluster — the same gap as scifireality/.agents, and the same decision
+#    covers both: a self-hosted GitHub runner on the ocean host (the Forgejo
+#    `native` pattern) or mirroring the catalog into git.ncrmro.com and
+#    deploying from Forgejo Actions.
+# Flip `on:` to the push trigger below once both hold, and replace the
+# identity step with the chosen mechanism.
+#
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - agents/**
+#       - skills/**
+#       - .github/workflows/deploy.yml
+name: deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # Placeholder label: no such runner is registered yet — gate 2 above.
+    # A dispatch today queues until one exists; it cannot leak onto a
+    # GitHub-hosted runner, which is the point.
+    runs-on: [self-hosted, ocean]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      # Identity is established here (gate 2), then asserted by the action.
+      - name: Point kubectl at ocean as the deploy identity
+        run: |
+          set -euo pipefail
+          echo "gate 2 unresolved: no deploy identity mechanism chosen" >&2
+          exit 1
+
+      # Exact-SHA pin, updated deliberately: the action patches custom
+      # resources whose API group already changed once, so the deploy step
+      # and the CRDs it patches move as one bump.
+      - name: Deploy the catalog revision
+        uses: ai-outfitter/agent-operator/actions/deploy-catalog@b4228496b6b3dfd26b98c68e49c433f5d631b0c1
+        with:
+          revision: ${{ github.sha }}
+          catalog-source: ncrmro-agents
+          field-manager: agents-catalog-deploy
