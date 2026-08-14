@@ -6,11 +6,12 @@ skills:
   - google-workspace
   - forge-collaboration
   - mail
-mcp:
-  - chrome-devtools
-  - google-gmail
-  - google-calendar
-  - google-contacts
+# TODO(image-outfitter): restore the mcp list (chrome-devtools, google-gmail,
+# google-calendar, google-contacts) once the pinned link-agent image carries
+# an outfitter that projects mcp for pi -- the deployed pin predates that and
+# fails --strict on it. The resident pod still gets its MCP servers through
+# the catalog's mcp.json via pi-mcp-adapter; local claude runs lose the
+# declared list until the pin moves.
 extensions:
   # channels v1.6.1 (A2A task plane) by its release commit: tag v1.6.1 =
   # 03fb6d2. Pinned by git because the npm publish of 1.6.x is blocked on the
