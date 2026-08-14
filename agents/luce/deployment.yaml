@@ -30,6 +30,12 @@ metadata:
   name: luce-runtime
   namespace: agent-luce
 data:
+  # The pinned link-agent image's entrypoint ignores container args and runs
+  # the agent named by LINK_AGENT_SLUG, falling back to the image-baked
+  # sample profile. The retired link-operator set this variable; the
+  # agent-operator does not, so the manifest must. Remove this key when the
+  # fleet moves off the legacy image.
+  LINK_AGENT_SLUG: "luce"
   # forgejo remains luce's primary wake path — it starts work because a review
   # was requested or an issue assigned. jmap adds a mailbox so a human can
   # reach it directly. Listing a channel whose credentials are absent is safe:
