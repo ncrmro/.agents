@@ -20,7 +20,7 @@ extensions:
   # relay server's (vega's). The resident deployment's setup script greps this
   # exact `git:...channels@<sha>` line to pre-install the extension — keep the
   # pin on one line.
-  - git:github.com/ai-outfitter/channels@5c2e3056db815a7d3664347a7f6bb64f78eae515
+  - git:github.com/ai-outfitter/channels@7bd019eeb928a09f062de090d2d8e35bb30a7d77
 # The resident pod needs an explicit model (its Pi auth is seeded on the PVC);
 # locally this is an override you can bypass per-run.
 model: openai-codex/gpt-5.6-luna
