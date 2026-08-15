@@ -1,0 +1,19 @@
+# Temporary diagnostic: prove the mirror can run any workflow on the native
+# runner and show the env the deploy workflow depends on. Delete after use.
+name: probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.forgejo/workflows/probe.yml]
+jobs:
+  probe:
+    runs-on: native
+    enable-openid-connect: true
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo "probe ok on $(uname -a)"
+          echo "OIDC url present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+          echo "PATH=$PATH"
+          command -v git node curl || true
