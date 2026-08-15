@@ -44,6 +44,10 @@ data:
   # chatto puts it in the shared Chatto room, so a human can ask it a question
   # in chat.
   OUTFITTER_CHANNELS: jmap,agent,forgejo,chatto
+  # Durable task-plane store on the workspace PVC. The channels task plane
+  # defaults to $XDG_DATA_HOME/outfitter/channels/task-plane; pin it to the
+  # PVC explicitly so Tasks and the activation journal survive pod restarts.
+  CHANNELS_TASK_STORE_PATH: /workspace/.local/share/outfitter/channels/task-plane
   LINK_MAIL_PROCESSED: Processed
   # Matches Link's stable runtime identity projected into the agent workload.
   AGENT_ENDPOINT_ID: link:luce
