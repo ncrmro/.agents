@@ -8,25 +8,21 @@
 # reach ocean, and the mirror gives the same Forgejo Actions OIDC identity
 # every other catalog uses.
 #
-# ── GATES — this workflow is workflow_dispatch-only until all clear ─────────
+# ── GATES — all cleared 2026-08-15 ──────────────────────────────────────────
 # 1. Ocean runs the aioutfitter.com operator (the migration landed).
-# 2. The mirror repository exists on git.ncrmro.com and syncs from GitHub.
-# 3. The trust in deploy/rbac.yaml is admin-applied
-#    (kubectl apply --server-side -f deploy/rbac.yaml); the OIDC subject
-#    embeds this repository and workflow path.
-# Flip `on:` to the push trigger below once all hold.
-#
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-#       - agents/**
-#       - skills/**
-#       - .forgejo/workflows/deploy.yml
+# 2. The mirror repository exists on git.ncrmro.com (pull mirror, 10m sync)
+#    with Actions enabled.
+# 3. The trust in deploy/rbac.yaml is admin-applied.
 name: deploy
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - agents/**
+      - skills/**
+      - .forgejo/workflows/deploy.yml
 
 jobs:
   deploy:
@@ -44,6 +40,42 @@ jobs:
       # kubeconfig secret, no stored cluster credential. The action asserts
       # what this identity can and cannot do; establishing it is this step's
       # job. jq is required by the action and used here too.
+      # The native host ships neither kubectl nor jq (runs 1–9 of this
+      # workflow bisected to exactly that: any step piping through jq failed
+      # in under a second with no readable logs — the old fleet leg parsed
+      # JSON with node for the same reason). Install both pinned into the
+      # runner's temp dir; kubectl verifies against its published .sha256
+      # (vega's pattern), jq against a checksum recorded at pin time.
+      # GITHUB_PATH makes them visible to the deploy-catalog action, which
+      # preflights for both.
+      - name: Install pinned kubectl and jq
+        env:
+          BIN: ${{ runner.temp }}/bin
+          KUBECTL_VERSION: v1.35.4
+          JQ_VERSION: jq-1.7.1
+          JQ_SHA256: 5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5
+        run: |
+          set -euo pipefail
+          mkdir -p "$BIN"
+          curl --fail --silent --show-error --location \
+            --output "$BIN/kubectl" \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          curl --fail --silent --show-error --location \
+            --output "$BIN/kubectl.sha256" \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+          printf '%s  %s\n' "$(cat "$BIN/kubectl.sha256")" "$BIN/kubectl" |
+            sha256sum --check --strict
+          curl --fail --silent --show-error --location \
+            --output "$BIN/jq" \
+            "https://github.com/jqlang/jq/releases/download/${JQ_VERSION}/jq-linux-amd64"
+          printf '%s  %s\n' "$JQ_SHA256" "$BIN/jq" | sha256sum --check --strict
+          chmod 0700 "$BIN/kubectl" "$BIN/jq"
+          echo "$BIN" >> "$GITHUB_PATH"
+
+      # Identity: Forgejo Actions OIDC straight to the Kubernetes API — no
+      # kubeconfig secret, no stored cluster credential. Token exchange is
+      # the same one the retired fleet leg performed; the action asserts what
+      # this identity can and cannot do, establishing it is this step's job.
       - name: Point kubectl at ocean as the deploy identity
         env:
           KUBE_SERVER: https://100.64.0.6:6443
