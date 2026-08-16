@@ -45,16 +45,13 @@
       "command": "npx",
       "args": [
         "-y",
-        "chrome-devtools-mcp@latest",
+        "chrome-devtools-mcp@1.6.0",
         "--headless",
         "--isolated",
-        "--executablePath",
-        "/etc/profiles/per-user/ncrmro/bin/chromium",
-        "--performanceCrux=false",
-        "--usageStatistics=false"
+        "--no-performance-crux",
+        "--no-usage-statistics"
       ],
       "env": {
-        "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1",
         "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"
       }
     }
