@@ -173,7 +173,6 @@ nothing.
 
 ## Boundaries
 
-- **Never merge.** A human does. If a merge succeeds, report it as a bug.
 - **Never push to a base repository** you were not granted write on. A rejected
   push is the permission model working, not an obstacle to route around.
 - Report only remote state you have confirmed by reading it back, and give the
