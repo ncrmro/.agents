@@ -1,5 +1,4 @@
-# Temporary diagnostic: bisect deploy.yml step failures as separate jobs.
-# Delete after use.
+# Temporary diagnostic round 2. Delete after use.
 name: probe
 on:
   workflow_dispatch:
@@ -7,102 +6,26 @@ on:
     branches: [main]
     paths: [.forgejo/workflows/probe.yml]
 jobs:
-  install-tools:
-    runs-on: native
-    timeout-minutes: 5
-    steps:
-      - name: Install pinned kubectl and jq
-        env:
-          BIN: ${{ runner.temp }}/bin
-          KUBECTL_VERSION: v1.35.4
-          JQ_VERSION: jq-1.7.1
-          JQ_SHA256: 5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5
-        run: |
-          set -euo pipefail
-          mkdir -p "$BIN"
-          curl --fail --silent --show-error --location \
-            --output "$BIN/kubectl" \
-            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-          curl --fail --silent --show-error --location \
-            --output "$BIN/kubectl.sha256" \
-            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
-          printf '%s  %s\n' "$(cat "$BIN/kubectl.sha256")" "$BIN/kubectl" |
-            sha256sum --check --strict
-          curl --fail --silent --show-error --location \
-            --output "$BIN/jq" \
-            "https://github.com/jqlang/jq/releases/download/${JQ_VERSION}/jq-linux-amd64"
-          printf '%s  %s\n' "$JQ_SHA256" "$BIN/jq" | sha256sum --check --strict
-          chmod 0700 "$BIN/kubectl" "$BIN/jq"
-          echo "$BIN" >> "$GITHUB_PATH"
-
-      # Identity: Forgejo Actions OIDC straight to the Kubernetes API — no
-      # kubeconfig secret, no stored cluster credential. Token exchange is
-      # the same one the retired fleet leg performed; the action asserts what
-      # this identity can and cannot do, establishing it is this step's job.
-  oidc-token:
+  token-fetch:
     runs-on: native
     enable-openid-connect: true
     timeout-minutes: 5
     steps:
-      - name: Install pinned kubectl and jq
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Fetch OIDC token only
         env:
-          BIN: ${{ runner.temp }}/bin
-          KUBECTL_VERSION: v1.35.4
-          JQ_VERSION: jq-1.7.1
-          JQ_SHA256: 5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5
-        run: |
-          set -euo pipefail
-          mkdir -p "$BIN"
-          curl --fail --silent --show-error --location \
-            --output "$BIN/kubectl" \
-            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-          curl --fail --silent --show-error --location \
-            --output "$BIN/kubectl.sha256" \
-            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
-          printf '%s  %s\n' "$(cat "$BIN/kubectl.sha256")" "$BIN/kubectl" |
-            sha256sum --check --strict
-          curl --fail --silent --show-error --location \
-            --output "$BIN/jq" \
-            "https://github.com/jqlang/jq/releases/download/${JQ_VERSION}/jq-linux-amd64"
-          printf '%s  %s\n' "$JQ_SHA256" "$BIN/jq" | sha256sum --check --strict
-          chmod 0700 "$BIN/kubectl" "$BIN/jq"
-          echo "$BIN" >> "$GITHUB_PATH"
-
-      # Identity: Forgejo Actions OIDC straight to the Kubernetes API — no
-      # kubeconfig secret, no stored cluster credential. Token exchange is
-      # the same one the retired fleet leg performed; the action asserts what
-      # this identity can and cannot do, establishing it is this step's job.
-      - name: Point kubectl at ocean as the deploy identity
-        env:
-          KUBE_SERVER: https://100.64.0.6:6443
           KUBE_OIDC_AUDIENCE: kubernetes-ocean
         run: |
           set -euo pipefail
-          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Forgejo Actions OIDC request URL is unavailable}"
-          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Forgejo Actions OIDC request token is unavailable}"
-          oidc_token="$(
-            curl --fail --silent --show-error \
-              --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${KUBE_OIDC_AUDIENCE}" | jq -er .value
-          )"
-          kubeconfig="${RUNNER_TEMP:-/tmp}/deploy-kubeconfig"
-          touch "$kubeconfig" && chmod 0600 "$kubeconfig"
-          export KUBECONFIG="$kubeconfig"
-          kubectl config set-cluster ocean \
-            --server="$KUBE_SERVER" \
-            --certificate-authority="$PWD/.forgejo/ocean-server-ca.crt" \
-            --embed-certs >/dev/null
-          kubectl config set-credentials deploy --token="$oidc_token" >/dev/null
-          kubectl config set-context ocean --cluster=ocean --user=deploy >/dev/null
-          kubectl config use-context ocean >/dev/null
-          echo "KUBECONFIG=$kubeconfig" >> "$GITHUB_ENV"
-
-      # Exact-SHA pin, updated deliberately: the action patches custom
-      # resources whose API group already changed once, so the deploy step
-      # and the CRDs it patches move as one bump. Fully qualified because a
-      # bare `uses:` resolves against the Forgejo instance, not github.com.
-  checkout-only:
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?OIDC request URL unavailable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?OIDC request token unavailable}"
+          curl --fail --silent --show-error \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${KUBE_OIDC_AUDIENCE}" > /tmp/tok.json
+          grep -q '"value"' /tmp/tok.json && echo "token fetched"
+  ca-file:
     runs-on: native
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: ls -la .forgejo/ocean-server-ca.crt
