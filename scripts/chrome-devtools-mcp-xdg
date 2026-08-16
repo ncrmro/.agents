@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() {
+  printf 'chrome-devtools-mcp-xdg: %s\n' "$*" >&2
+  exit 1
+}
+
+desktop_id=""
+if command -v xdg-settings >/dev/null 2>&1; then
+  desktop_id="$(xdg-settings get default-web-browser 2>/dev/null || true)"
+fi
+if [[ -z "$desktop_id" ]] && command -v xdg-mime >/dev/null 2>&1; then
+  desktop_id="$(xdg-mime query default x-scheme-handler/http 2>/dev/null || true)"
+fi
+
+[[ -n "$desktop_id" ]] || fail "XDG does not define a default web browser."
+[[ "$desktop_id" != */* ]] || fail "XDG returned an invalid desktop ID: $desktop_id"
+
+desktop_file=""
+data_dirs="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+IFS=: read -r -a search_dirs <<<"$data_dirs"
+for data_dir in "${search_dirs[@]}"; do
+  candidate="$data_dir/applications/$desktop_id"
+  if [[ -f "$candidate" ]]; then
+    desktop_file="$candidate"
+    break
+  fi
+done
+
+[[ -n "$desktop_file" ]] || fail "Cannot find the XDG desktop entry: $desktop_id"
+
+browser_command="$(sed -n 's/^TryExec=//p' "$desktop_file" | head -n 1)"
+if [[ -z "$browser_command" ]]; then
+  exec_line="$(sed -n 's/^Exec=//p' "$desktop_file" | head -n 1)"
+  [[ -n "$exec_line" ]] || fail "The desktop entry has no Exec field: $desktop_file"
+  if [[ "$exec_line" == \"* ]]; then
+    browser_command="${exec_line#\"}"
+    browser_command="${browser_command%%\"*}"
+  else
+    browser_command="${exec_line%%[[:space:]]*}"
+  fi
+fi
+
+if [[ "$browser_command" == */* ]]; then
+  browser_executable="$browser_command"
+else
+  browser_executable="$(command -v -- "$browser_command" || true)"
+fi
+
+[[ -x "$browser_executable" ]] || fail "The default browser executable is not available: $browser_command"
+
+browser_version="$($browser_executable --version 2>/dev/null || true)"
+case "$browser_version" in
+  *Chromium* | *Chrome* | *Edge*) ;;
+  *) fail "The XDG default is not a Chromium-family browser: ${browser_version:-$browser_command}" ;;
+esac
+
+if [[ "${1:-}" == "--print-browser" ]]; then
+  printf '%s\n' "$browser_executable"
+  exit 0
+fi
+
+exec npx -y chrome-devtools-mcp@1.6.0 \
+  --headless \
+  --isolated \
+  --no-performance-crux \
+  --no-usage-statistics \
+  --executablePath "$browser_executable" \
+  "$@"

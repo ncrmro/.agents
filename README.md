@@ -42,6 +42,12 @@ Outfitter v1 resolves resources from project `.agents/`, then global `~/.agents/
 
 **Enable Playwright MCP** — run `scripts/install-playwright-mcp.sh` once per machine. It installs `playwright-mcp` and Nix-managed Chromium browsers into the default Nix profile, writes a PATH wrapper at `~/.local/bin/mcp-server-playwright`, and verifies that the `mcp.json` command can start.
 
+**Enable Chrome DevTools MCP** — link `scripts/chrome-devtools-mcp-xdg` into a
+directory on `PATH` as `chrome-devtools-mcp-xdg`. The launcher reads the XDG
+default browser desktop entry at startup and passes its Chromium-family
+executable to Chrome DevTools MCP. It does not use the browser's persistent
+profile.
+
 ## Upstream sources
 
 - [ai-outfitter/default-profiles](https://github.com/ai-outfitter/default-profiles) — published v1 defaults
