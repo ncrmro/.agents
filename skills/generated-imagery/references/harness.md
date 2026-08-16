@@ -1,5 +1,29 @@
 # The generation harness
 
+## Do in the script what the script can do
+
+The prompt tree exists to make generation reproducible. Resolving it inside the
+non-deterministic part of the system gives that up.
+
+**Anything you delegate to the agent's judgement is not reproducible, and
+anything you ask the agent to report about its own behaviour is not evidence.**
+
+So the harness resolves the tree, freezes it, inlines the text, and empties the
+working directory. The agent's only job is the one thing a script cannot do:
+make the picture. `references/prompt-tree.md` carries the audit that forced this,
+and the four steps in detail.
+
+Three consequences for the harness:
+
+- **Pass finished text, not references.** Whether an agent reads the right files,
+  no files, or every file in the directory varies by model and by run, and both
+  failures are silent.
+- **Give each run an empty working directory.** Containment beats instruction: a
+  run that cannot reach the image set cannot borrow from another image.
+- **Never take provenance from the agent.** The fragment list comes from the
+  frozen manifest. Ask the agent only about things you can check yourself, such
+  as whether a file exists on disk.
+
 ## One call per variant
 
 Run one backend call per variant, in parallel. Do not ask one call to produce N
@@ -11,8 +35,8 @@ the backend's self-review off. A separate pass does review, on the review
 surface, with a human or a fresh-context agent looking at it.
 
 Low reasoning effort is enough. The model chooses nothing during generation --
-it reads a tree and calls an image tool -- so reasoning buys wall-clock rather
-than pixels.
+it receives finished text and calls an image tool -- so reasoning buys wall-clock
+rather than pixels.
 
 ## Variant suffixes must not run out silently
 
@@ -33,17 +57,27 @@ Append one line per render to a JSONL log, carrying at least:
 | prompt | the content hash of the frozen tree |
 | model, effort, tier | the settings, so two rounds are comparable |
 | seconds, tokens | what the round cost |
-| fragments | the run's own account of every file it read |
+| fragments | every file in the tree, **taken from the frozen manifest** |
 | saved, on_disk, error | whether a picture actually exists |
 
-Without this you cannot say why one round looks worse than the last. The
-`fragments` list is the one field that catches a tree which failed to resolve:
-without it, a missing fragment shows up only in the picture, as a mystery.
+Without this you cannot say why one round looks worse than the last.
+
+Take `fragments` from the snapshot manifest, never from the agent. An earlier
+version of this harness asked the run to report the files it had read, and the
+report was correct in exactly the case that mattered: a run that had opened
+nothing still listed the complete tree, because it was reporting the tree it was
+meant to load. A field that is right when things go right and also right when
+they go wrong measures nothing.
 
 ## Structured output
 
 A structured output schema makes each run append its own row rather than making
 the script parse logs.
+
+**Ask the run only what you can verify.** Whether a file exists at a path is
+checkable, so `saved` and `path` are worth having beside the script's own
+`on_disk` check -- a disagreement between them is itself a finding. What the run
+read, thought, or intended is not checkable, so it does not belong in the schema.
 
 **A strict JSON Schema requires every property to be listed in `required`.** An
 optional field is expressed as a nullable type, not as an absent requirement:
@@ -83,7 +117,9 @@ A local page, served from the image set directory. What it must have:
   Evidence is consulted after a verdict forms, not scrolled past to reach the
   thing being judged.
 - **Per-render provenance on the card**: model, effort, tier, duration, tokens,
-  how many files the run read, and a link to the prompt snapshot.
+  how many files the frozen tree held, and a link to the prompt snapshot. Link
+  the snapshot's `resolved.txt` too: that is the text the render was actually
+  made from, and it is the artifact to diff when a look regresses.
 - **A verdict and a note per candidate**, appended to a feedback log. Keep each
   card self-contained: judging two renders at once is how a defect in the second
   gets excused by the first.

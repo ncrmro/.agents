@@ -12,8 +12,9 @@ a prompt. The craft rules below improve one image too.
 
 | script (in `assets/`) | does |
 | --- | --- |
-| `snapshot-prompt.py <id>` | Resolves the whole prompt tree, freezes it under a content hash, prints the hash. |
-| `generate.sh <id> <count>` | Snapshots, then runs one backend call per variant in parallel, and appends provenance. |
+| `snapshot-prompt.py <id>` | Resolves the tree, freezes it and the resolved text under a content hash, prints the hash. |
+| `snapshot-prompt.py --resolve <id>` | Prints the whole tree as one document, ready to send. Writes nothing. |
+| `generate.sh <id> <count>` | Snapshots, then runs one backend call per variant in parallel, each with the resolved text inline in its own empty directory, and appends provenance. |
 | `check-prompts.sh` | Flags the prose habits an image model cannot act on, plus unreferenced fragments. |
 
 All three take the image set directory from `IMAGESET_ROOT` (default: the current
@@ -85,14 +86,58 @@ constraint that only states the truth does not stop the repeat.
 ```
 
 Write a reference as `@<relative-path>.md`, inside the sentence that needs it.
-References resolve recursively: a prompt names a subject, the subject names its
-components. A fix to a shared fact then reaches every image that shows it,
+The scripts resolve them recursively: a prompt names a subject, the subject names
+its components. A fix to a shared fact then reaches every image that shows it,
 instead of being retyped per image and drifting apart.
+
+**A reference is an instruction to your tooling, not to the generating agent.**
+Resolve the tree with the script and send the model finished text. Never hand it
+an `@` reference and trust it to follow the trail — see below.
 
 **Separate the part from its placement.** A component fragment carries its own
 dimensions and form, and never reaches for a subject to size itself against. The
 subject that carries it says where it goes and how many. The scene prompt is
 where they meet.
+
+## Do in the script what the script can do
+
+**Anything you delegate to the agent's judgement is not reproducible, and
+anything you ask the agent to report about its own behaviour is not evidence.**
+
+The prompt tree exists to make generation deterministic. Resolving it inside the
+non-deterministic part gives that up. Where a step can be done by a script, do it
+in the script. The agent's only job is the one thing a script cannot do.
+
+Reference resolution is the case that proves it. An audit of one nine-image run,
+comparing what each generation was asked to read against what it executed, found
+the delegation failing in both directions and silently in both:
+
+- One run read **only the scene file**, and drew a subject it had no dimensions,
+  materials or palette for. The picture looked plausible and was wrong throughout.
+- Several runs read **every fragment in the directory** — 26 files where the tree
+  was 3 — and pulled in components belonging to other images.
+- One model resolved the tree correctly; another did not; the same model varied
+  between runs. **Reference resolution is emergent agent behaviour, not a
+  platform guarantee.**
+- The agent's own report of which fragments it read listed the correct tree in
+  the failing case. **Self-reported provenance is worthless** — it reports the
+  tree the agent was supposed to load, not the one it did.
+
+So the harness, and the shipped scripts, do this instead:
+
+1. **Resolve the tree in the script.** `--resolve` prints the whole tree as one
+   document: shared context first, the scene prompt last, with each `@path.md`
+   token rewritten to the bare name so the inlined sentences still read.
+2. **Pass that text inline**, between markers, and say plainly that the
+   description is complete and there is nothing to read.
+3. **Run each generation in its own empty scratch directory**, then move the
+   render out. With the set unreachable, a run cannot wander into another image's
+   fragments. This is containment, not tidiness.
+4. **Take the fragment list from the frozen manifest**, never from the agent. Ask
+   the agent only what you can check yourself.
+
+There is no budget argument against inlining: a whole resolved tree of around
+14 kB costs nothing measurable against the harness's own system prompt.
 
 ## Workflow
 
@@ -103,10 +148,13 @@ where they meet.
 3. Write one prompt per image using the four sections below, referencing the
    design file and the subjects.
 4. Run `check-prompts.sh`. Fix what it flags, or decide the hit is correct prose.
-5. Run `generate.sh <id> 3`. It snapshots the tree first.
-6. Review on the local surface: latest generation only, prompt beside the render,
-   provenance on the card.
-7. Fix the fragment, not the image. Regenerate everything that fragment feeds.
+5. Read `snapshot-prompt.py --resolve <id>` once. It is what the model will
+   receive, and a broken reference or a missing fragment shows up here rather
+   than in a picture an hour later.
+6. Run `generate.sh <id> 3`. It snapshots and resolves the tree first.
+7. Review on the local surface: latest generation only, resolved prompt beside
+   the render, provenance on the card.
+8. Fix the fragment, not the image. Regenerate everything that fragment feeds.
 
 ## The four sections, in this order, in every prompt
 
@@ -146,6 +194,8 @@ not by `lens: 85mm`.
 
 | symptom | cause | fix |
 | --- | --- | --- |
+| A render ignores everything its fragments specify — wrong proportions, no palette, invented scenery, yet plausible in itself | the run never opened the referenced files; resolution was left to the agent, which read only the scene file | resolve the tree in the script and pass the whole text inline. Do not trust the run's own report of what it read — it lists the tree it was meant to load |
+| A render contains an object no fragment in its tree mentions | the run read every file in the directory instead of the tree, and borrowed from another image | pass finished text, and generate in an empty scratch directory so the set is unreachable |
 | Surfaces look smooth, moulded, plastic — a product render | the fragment carries dimensions and no material noun | add a material sentence to every surface |
 | Still plastic after adding material words | camera square-on and light flat, so the texture is geometrically invisible | move the camera off square and rake the key light |
 | A component renders at the wrong size | a figure with no familiar-object anchor | keep the figure, add the anchor |
@@ -168,7 +218,11 @@ not by `lens: 85mm`.
   exhausted itself and the script reported success having generated nothing.
   Extend the alphabet, and fail loudly when suffixes run short.
 - **Record provenance per render** — model, effort, tier, seconds, tokens, and
-  the run's own list of files it read — or two rounds cannot be compared.
+  the file list **from the frozen manifest** — or two rounds cannot be compared.
+- **Ask the run only what you can verify.** Whether a file exists at a path is
+  checkable, so a disagreement between the run's `saved` and the script's own
+  on-disk check is a finding. What the run read or intended is not checkable, so
+  it does not belong in the output schema.
 - **A strict JSON Schema needs every property in `required`.** Express an
   optional field as a nullable type, not as an absent requirement.
 - **The orphan check must walk the whole tree**, because a fragment can be

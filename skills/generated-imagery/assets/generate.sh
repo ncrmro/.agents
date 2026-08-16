@@ -3,10 +3,12 @@
 #
 #   IMAGESET_ROOT=. ./generate.sh hero 3 "optional extra instruction"
 #
-# The script freezes the prompt tree, then runs one backend call per variant, in
-# parallel. Each call makes one image and exits. Nothing reviews its own output;
-# a separate pass does that. Variant suffixes continue from what already exists,
-# so a rerun never overwrites an earlier batch.
+# The script freezes the prompt tree, resolves it to one document, then runs one
+# backend call per variant, in parallel. Each call receives the whole resolved
+# text inline and runs in its own empty scratch directory, so it has nothing to
+# read and nothing to wander into. Each call makes one image and exits. Nothing
+# reviews its own output; a separate pass does that. Variant suffixes continue
+# from what already exists, so a rerun never overwrites an earlier batch.
 #
 #   ./generate.sh --model <name> hero 3     # a different model
 #   ./generate.sh --effort medium hero 3    # more reasoning
@@ -60,30 +62,49 @@ mkdir -p "$OUT"
 
 HASH="$(IMAGESET_ROOT="$ROOT" "$SCRIPTS/snapshot-prompt.py" "$ID")"
 
+# The resolved document, read back from the frozen snapshot rather than
+# regenerated, so the bytes that were sent are exactly the bytes on record.
+RESOLVED="$OUT/prompts/$HASH/resolved.txt"
+[ -f "$RESOLVED" ] || { echo "no resolved prompt in snapshot $HASH" >&2; exit 1; }
+PROMPT_TEXT="$(cat "$RESOLVED")"
+
 # ---------------------------------------------------------------------------
 # THE BACKEND CALL. This is the one function to swap for a different tool.
 #
-# Reference implementation: `codex exec`, which resolves the @ references in the
-# prompt file itself, reads every referenced file, and calls its image tool. A
-# backend that does not resolve references must be handed the concatenated
-# snapshot at $OUT/prompts/$HASH/ instead.
+# Reference implementation: `codex exec`. Two things matter more than the tool.
 #
-# Contract: generate exactly one image at $2, write a JSON object matching
-# generate-schema.json to $3, and send all chatter to stdout.
+# 1. The whole resolved tree goes in the prompt text. Never pass an @ reference
+#    and trust the agent to follow it. Whether it reads the right files, no
+#    files, or every file in the directory varies by model and by run, and both
+#    failures are silent.
+# 2. --cd puts the run in an empty scratch directory. With the image set
+#    unreachable, a run that decides to go looking finds nothing, so one image's
+#    fragments cannot leak into another image's render. This is containment,
+#    not tidiness.
+#
+# Contract: generate exactly one image at ./<basename> inside the scratch
+# directory, write a JSON object matching generate-schema.json to $4, and send
+# all chatter to stdout.
 # ---------------------------------------------------------------------------
 generate_one() {
-	local prompt_id="$1" image_path="$2" result_json="$3"
+	local prompt_text="$1" work="$2" image_name="$3" result_json="$4"
 
 	local opts=(-c model_reasoning_effort="$EFFORT")
 	$RUN_FAST && opts+=(--enable fast_mode -c service_tier="fast")
 	[ -n "$MODEL" ] && opts+=(-m "$MODEL")
 
-	codex exec --skip-git-repo-check --sandbox workspace-write "${opts[@]}" \
+	codex exec --skip-git-repo-check --sandbox workspace-write --cd "$work" "${opts[@]}" \
 		--output-schema "$SCRIPTS/generate-schema.json" \
 		--output-last-message "$result_json" \
-		"The prompt is @prompts/$prompt_id.md
+		"Generate one image with the image tool, size $SIZE, saved as ./$image_name
 
-Generate one image with the image tool, size $SIZE, saved as $image_path
+The complete description is between the markers below. It is self-contained:
+every part of it is already here. Do not read any file. Do not search for
+anything. There is nothing else to load.
+
+--- BEGIN DESCRIPTION ---
+$prompt_text
+--- END DESCRIPTION ---
 
 $EXTRA
 
@@ -105,15 +126,22 @@ done
 names=()
 for S in "${suffixes[@]}"; do names+=("$ID-$S-$BACKEND.png"); done
 
-echo "generating $COUNT for $ID  (prompt tree $HASH)  -> ${names[*]}" >&2
+echo "generating $COUNT for $ID  (prompt tree $HASH, ${#PROMPT_TEXT} chars inline)  -> ${names[*]}" >&2
 
 RUN_MODEL="${MODEL:-default}"
-cd "$ROOT"
+
+# What the tree actually was, taken from the frozen manifest. Never ask the
+# agent which files it read: it reports the tree it was meant to load, not the
+# one it loaded, so a run that read nothing still reports a complete list.
+FRAGMENTS_JSON="$(IMAGESET_ROOT="$ROOT" "$SCRIPTS/snapshot-prompt.py" --fragments "$HASH" \
+	| python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')"
 
 pids=()
 for n in "${names[@]}"; do
+	work="$OUT/.work-${n%.png}"
+	rm -rf "$work"; mkdir -p "$work"
 	date +%s > "$OUT/.start-${n%.png}"
-	generate_one "$ID" "out/$n" "$OUT/.result-${n%.png}.json" \
+	generate_one "$PROMPT_TEXT" "$work" "$n" "$OUT/.result-${n%.png}.json" \
 		> "$OUT/.log-${n%.png}-$HASH.txt" 2>&1 &
 	pids+=($!)
 done
@@ -121,10 +149,15 @@ done
 status=0
 for p in "${pids[@]}"; do wait "$p" || status=1; done
 
+# Move each render out of its scratch directory, then take the directory away.
+for n in "${names[@]}"; do
+	work="$OUT/.work-${n%.png}"
+	[ -f "$work/$n" ] && mv "$work/$n" "$OUT/$n"
+	rm -rf "$work"
+done
+
 # What each run cost, recorded beside what it produced. Two rounds are only
-# comparable when the settings behind both are on disk. The fragment list is the
-# run's own account of what it read, so a tree that failed to resolve shows up
-# here and not only in the picture.
+# comparable when the settings behind both are on disk.
 for n in "${names[@]}"; do
 	result="$OUT/.result-${n%.png}.json"
 	started="$(cat "$OUT/.start-${n%.png}" 2>/dev/null || echo 0)"
@@ -139,7 +172,7 @@ for n in "${names[@]}"; do
 
 	IMAGE="$n" PROMPT="$HASH" AT="$(date -Iseconds)" OUT="$OUT" \
 	RUN_MODEL="$RUN_MODEL" EFFORT="$EFFORT" RUN_FAST="$RUN_FAST" TOOK="$took" \
-	TOKENS="${tokens:-}" \
+	TOKENS="${tokens:-}" FRAGMENTS="$FRAGMENTS_JSON" \
 	python3 - "$result" <<'PY' >> "$OUT/provenance.jsonl"
 import json, os, sys
 row = {
@@ -150,12 +183,15 @@ row = {
     "effort": os.environ["EFFORT"],
     "fast": os.environ["RUN_FAST"] == "true",
     "seconds": int(os.environ["TOOK"]),
+    "tokens": int(os.environ["TOKENS"]) if os.environ.get("TOKENS") else None,
+    # From the frozen manifest, not from the agent's own account of itself.
+    "fragments": json.loads(os.environ["FRAGMENTS"]),
 }
 row["on_disk"] = os.path.exists(os.path.join(os.environ["OUT"], row["image"]))
 try:
     with open(sys.argv[1]) as handle:
         result = json.load(handle)
-    row.update({k: result[k] for k in ("saved", "size", "fragments", "error") if k in result})
+    row.update({k: result[k] for k in ("saved", "size", "error") if k in result})
 except Exception as problem:
     row["error"] = f"no structured result: {problem}"
 print(json.dumps(row))

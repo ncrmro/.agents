@@ -13,8 +13,8 @@
 ```
 
 A prompt references the design language and whichever subjects appear. A subject
-references its own components. References resolve recursively, at least two
-levels deep, with no instruction needed by the model.
+references its own components. The scripts resolve the references recursively,
+however many levels deep they go.
 
 The point is propagation. A fix to a shared fact reaches every image that shows
 it. The alternative -- retyping the fact into each prompt -- drifts apart within
@@ -27,8 +27,69 @@ Write `@<relative-path>.md` inside the sentence that needs it.
 > A station arm per @../fragments/station-arm.md reaches in from one side.
 
 The tooling matches `@` followed by a path ending in `.md`, anywhere on a line.
-Both the snapshot script and the review surface resolve the whole tree, so the
-same syntax drives generation, freezing and review.
+The snapshot script, the generation script and the review surface all resolve
+the tree with that one pattern.
+
+## Resolve the tree in the script, never in the agent
+
+**A reference is an instruction to your tooling. It is not an instruction to the
+image-generating agent.** Resolve the tree with the script, and send the model
+finished text.
+
+An audit of the generation transcripts of one nine-image run, comparing what each
+run was asked to read against what it actually executed, found the delegation
+failing in both directions, and silently in both:
+
+- One run read **only the scene file**. It never opened the subject fragment or
+  the shared design file, and drew a subject it had no dimensions, materials or
+  palette for. The picture looked plausible and was wrong throughout: wrong
+  proportions, invented scenery.
+- Several runs read **every fragment in the directory** -- 26 files where the
+  prompt's tree was 3 -- and pulled in components belonging to other images. That
+  is how an unrelated piece of hardware appeared in a portrait of the subject
+  alone.
+- Runs on one model resolved the tree correctly, and even grepped recursively for
+  nested references. Runs on another model did not. It varied between runs on the
+  same model too. **Reference resolution is emergent agent behaviour, not a
+  platform guarantee.**
+- The agent's own structured report of which fragments it read listed the correct
+  tree in the failing case. **Self-reported provenance is worthless.** It reports
+  the tree the agent was supposed to load, not the one it did.
+
+There is no context-budget argument for delegating the reads either. A whole
+resolved tree of around 14 kB costs nothing measurable against the harness's own
+system prompt.
+
+### How the shipped scripts do it
+
+1. **Resolve to one document.** `snapshot-prompt.py --resolve <id>` walks the
+   references and prints the whole tree as one text. The referenced files come
+   first and the scene prompt comes last, so the instruction nearest the
+   generation is the one describing this image. Each `@path/name.md` token is
+   rewritten to the bare `name`, so "a fixture per @some-fixture.md bolts to the
+   plate" still reads as a sentence once the file is inlined beside it, under a
+   section header carrying that same name.
+2. **Pass the text inline**, between markers, and tell the model plainly that the
+   description is complete and there is nothing to read:
+
+   ```
+   The complete description is between the markers below. It is self-contained:
+   every part of it is already here. Do not read any file. Do not search for
+   anything. There is nothing else to load.
+   ```
+
+3. **Run each generation in its own empty scratch directory** (`--cd` on the
+   reference backend), then move the render out. With the image set unreachable,
+   a run that decides to go looking finds nothing, so one image's fragments
+   cannot leak into another image's render. This is containment, not tidiness.
+4. **Take the fragment list from the frozen snapshot manifest**
+   (`--fragments <hash>`), never from the agent. The output schema no longer asks
+   the agent what it read, because the answer was not evidence. It asks only what
+   the run did to the filesystem, which the script checks for itself.
+
+The generation script reads the resolved text back out of the frozen snapshot
+rather than resolving it a second time, so the bytes that were sent are exactly
+the bytes on record.
 
 ## The agent notes
 
@@ -112,8 +173,11 @@ Without this you cannot answer "what did we actually ask for when this came out
 wrong", because the files have moved on. With it, a regression is a diff.
 
 `assets/snapshot-prompt.py` writes `out/prompts/<hash>/` with a flattened copy of
-every file in the tree and a manifest of per-file hashes and byte counts. An
-unchanged tree reuses its existing snapshot rather than duplicating it.
+every file in the tree, a manifest of per-file hashes and byte counts, and
+`resolved.txt` -- the exact bytes the generation receives. Freeze the resolved
+document as well as its parts: a render is only reproducible from what was sent,
+and the manifest is also the only trustworthy record of which files went into it.
+An unchanged tree reuses its existing snapshot rather than duplicating it.
 
 The payoff arrives at the first regression. One "it went plastic again" traced
 to three separate sentence deletions across three files, each made by a

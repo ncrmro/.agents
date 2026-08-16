@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["saved", "path", "size", "fragments", "error"],
+  "required": ["saved", "path", "size", "error"],
   "properties": {
     "saved": {
       "type": "boolean",
@@ -9,16 +9,11 @@
     },
     "path": {
       "type": "string",
-      "description": "The path the image was saved to, relative to the image set directory."
+      "description": "The path the image was saved to, relative to the working directory."
     },
     "size": {
       "type": "string",
       "description": "Pixel dimensions of the generated image, as WIDTHxHEIGHT."
-    },
-    "fragments": {
-      "type": "array",
-      "description": "Every prompt file read for this generation, including the top level prompt and each file reached through an @ reference, relative to the image set directory.",
-      "items": { "type": "string" }
     },
     "error": {
       "type": ["string", "null"],
