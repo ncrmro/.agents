@@ -71,13 +71,25 @@ PROMPT_TEXT="$(cat "$RESOLVED")"
 # ---------------------------------------------------------------------------
 # THE BACKEND CALL. This is the one function to swap for a different tool.
 #
-# Reference implementation: `codex exec`. Two things matter more than the tool.
+# If the image tool has a direct API, call it here and delete the agent from the
+# path. An agent between the prompt and the renderer contributes nothing and adds
+# two failure modes: it fails to gather what you wrote, and it edits what it
+# gathered. Neither failure appears in its output. The direct call is normally
+# cheaper and faster as well. The trade is an API credential and metered billing.
+#
+# Reference implementation: `codex exec`. Three things matter more than the tool.
 #
 # 1. The whole resolved tree goes in the prompt text. Never pass an @ reference
 #    and trust the agent to follow it. Whether it reads the right files, no
 #    files, or every file in the directory varies by model and by run, and both
 #    failures are silent.
-# 2. --cd puts the run in an empty scratch directory. With the image set
+# 2. The text must reach the image tool VERBATIM, and the harness's own brevity
+#    rule must be named and overridden. A generating agent carries bundled
+#    instructions telling it to keep a prompt short and to add only what
+#    materially improves it. Left alone it obeys them: it compresses the whole
+#    specification into a short brief and calls the image tool with that. Every
+#    figure and every material sentence is discarded at the last step, invisibly.
+# 3. --cd puts the run in an empty scratch directory. With the image set
 #    unreachable, a run that decides to go looking finds nothing, so one image's
 #    fragments cannot leak into another image's render. This is containment,
 #    not tidiness.
@@ -98,13 +110,22 @@ generate_one() {
 		--output-last-message "$result_json" \
 		"Generate one image with the image tool, size $SIZE, saved as ./$image_name
 
-The complete description is between the markers below. It is self-contained:
-every part of it is already here. Do not read any file. Do not search for
-anything. There is nothing else to load.
+Pass the text between the markers below to the image tool as the prompt,
+VERBATIM. Do not summarise it. Do not shorten it. Do not rewrite it. Do not
+select from it. Copy it through unchanged.
 
---- BEGIN DESCRIPTION ---
+Your image-generation skill tells you to keep a prompt short and to add only
+what materially improves it. That rule does not apply here and you must not
+follow it. This text is not a brief to be worked up into a prompt. It is the
+prompt, already written, and every sentence in it is load-bearing. A figure you
+drop is a dimension the image gets wrong.
+
+The text is also complete. Do not read any file. Do not search for anything.
+There is nothing else to load.
+
+--- BEGIN PROMPT ---
 $prompt_text
---- END DESCRIPTION ---
+--- END PROMPT ---
 
 $EXTRA
 

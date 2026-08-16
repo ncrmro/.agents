@@ -13,16 +13,98 @@ working directory. The agent's only job is the one thing a script cannot do:
 make the picture. `references/prompt-tree.md` carries the audit that forced this,
 and the four steps in detail.
 
-Three consequences for the harness:
+**An agent between your prompt and the renderer will both fail to gather what you
+wrote, and edit what it gathered.** Neither failure appears in its output. Both
+appear only in the transcript.
+
+Four consequences for the harness:
 
 - **Pass finished text, not references.** Whether an agent reads the right files,
   no files, or every file in the directory varies by model and by run, and both
   failures are silent.
+- **Demand verbatim pass-through, and override the harness's own brevity rule by
+  name.** See the next section; this one costs the whole specification.
 - **Give each run an empty working directory.** Containment beats instruction: a
   run that cannot reach the image set cannot borrow from another image.
 - **Never take provenance from the agent.** The fragment list comes from the
   frozen manifest. Ask the agent only about things you can check yourself, such
   as whether a file exists on disk.
+
+## The agent silently rewrites the prompt
+
+A generating agent carries its own bundled image-generation instructions, and
+they are written for a person typing a one-line request. One such skill's
+augmentation rules said "keep it short" and "add only the details needed to
+improve the prompt materially".
+
+The agent obeyed them. It collected the whole specification, **compressed it into
+a short brief, and called the image tool with the brief**. Every dimension, every
+material sentence and every palette value was discarded at the last step. The
+render came back generic, glossy and smooth-surfaced, and read exactly like a
+prompt-craft failure. Inlining the whole tree had made it worse, because it gave
+the agent more to compress in one shot.
+
+The countermeasure is specific, because the rule it overrides is specific. A
+generic "use this text" does not survive a competing instruction:
+
+```
+Pass the text between the markers below to the image tool as the prompt,
+VERBATIM. Do not summarise it. Do not shorten it. Do not rewrite it. Do not
+select from it. Copy it through unchanged.
+
+Your image-generation skill tells you to keep a prompt short and to add only
+what materially improves it. That rule does not apply here and you must not
+follow it. This text is not a brief to be worked up into a prompt. It is the
+prompt, already written, and every sentence in it is load-bearing. A figure you
+drop is a dimension the image gets wrong.
+```
+
+Verified A/B on an identical tree and hash, same model and settings. Before: a
+smooth featureless subject at the wrong proportions, no surface detail, no
+fittings, wrong palette. After: correct proportions, the specified surface
+treatment with its fasteners and seams, the correct standardized fitting, the
+corner clusters each pointing four different ways as specified, and the
+restricted palette.
+
+It was also **cheaper and faster** -- fewer tokens and less wall-clock -- because
+the agent stopped doing editorial work. Verbatim pass-through is not a quality
+tax. The editorial pass was the tax.
+
+## Read the transcript, not just the image
+
+**A wrong image tells you something failed. Only the transcript tells you what
+the renderer was actually asked for.**
+
+In the case above the answer was "a fraction of the prompt". No amount of
+rewriting the prompt would ever have fixed it, and every rewrite would have
+looked like it nearly worked.
+
+So before you conclude a prompt is wrong, confirm what reached the renderer:
+
+1. Was the image tool called at all?
+2. Is the text it received the text the script sent?
+3. Did the run read anything it was told not to read?
+
+Keep the whole transcript per render, beside the picture. The shipped script
+writes one log per variant, named with the prompt hash.
+
+## Prefer a direct call over an agent
+
+**Where the image tool has an API you can call, call it, and delete the agent
+from the path.**
+
+The agent contributes nothing to generation. The script resolves the tree, the
+prompt is already written, and the picture is made by the image model either way.
+What the agent adds is the two failure modes above, both invisible in its output.
+
+The direct call is normally cheaper and faster as well. The trade is an API
+credential and metered billing rather than an existing subscription. That is a
+real decision, so make it deliberately, rather than defaulting into the agent
+path because a harness happened to be there already.
+
+This is the closing form of the rule at the top of this file: shrink the agent's
+job to the thing no script can do. For image generation that turns out to be
+nothing at all.
 
 ## One call per variant
 

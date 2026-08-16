@@ -69,13 +69,19 @@ system prompt.
    rewritten to the bare `name`, so "a fixture per @some-fixture.md bolts to the
    plate" still reads as a sentence once the file is inlined beside it, under a
    section header carrying that same name.
-2. **Pass the text inline**, between markers, and tell the model plainly that the
-   description is complete and there is nothing to read:
+2. **Pass the text inline**, between markers. Demand verbatim pass-through, and
+   tell the model plainly that the text is complete and there is nothing to read.
+   An agent left to its own bundled instructions summarises the prompt before the
+   renderer ever sees it, so the wording must override that rule by name.
+   `references/harness.md` carries the full wording and the A/B that verified it.
 
    ```
-   The complete description is between the markers below. It is self-contained:
-   every part of it is already here. Do not read any file. Do not search for
-   anything. There is nothing else to load.
+   Pass the text between the markers below to the image tool as the prompt,
+   VERBATIM. Do not summarise it. Do not shorten it. Do not rewrite it. Do not
+   select from it. Copy it through unchanged.
+   ...
+   The text is also complete. Do not read any file. Do not search for anything.
+   There is nothing else to load.
    ```
 
 3. **Run each generation in its own empty scratch directory** (`--cd` on the

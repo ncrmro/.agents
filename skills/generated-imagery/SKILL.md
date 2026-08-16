@@ -1,6 +1,6 @@
 ---
 name: generated-imagery
-description: Produce a set of generated images that look like one world — a prompt tree of shared fragments, content-addressed snapshots so a regression can be diffed rather than guessed at, a parallel generation harness with per-render provenance, and a review surface. Use when generating illustrations, renders, or concept imagery for a deck, site, game, or product; when images in a set drift apart between runs; when a render comes back looking like smooth plastic, at the wrong scale, or missing something the prompt asked for; when an image asserts something that contradicts the text beside it; or when setting up image generation for a project.
+description: Produce a set of generated images that look like one world — a prompt tree of shared fragments, content-addressed snapshots so a regression can be diffed rather than guessed at, a parallel generation harness with per-render provenance, and a review surface. Use when generating illustrations, renders, or concept imagery for a deck, site, game, or product; when images in a set drift apart between runs; when a render comes back looking like smooth plastic, at the wrong scale, or ignoring most of what the prompt asked for; when an image asserts something that contradicts the text beside it; or when setting up image generation for a project.
 ---
 
 # Generated imagery
@@ -14,13 +14,13 @@ a prompt. The craft rules below improve one image too.
 | --- | --- |
 | `snapshot-prompt.py <id>` | Resolves the tree, freezes it and the resolved text under a content hash, prints the hash. |
 | `snapshot-prompt.py --resolve <id>` | Prints the whole tree as one document, ready to send. Writes nothing. |
-| `generate.sh <id> <count>` | Snapshots, then runs one backend call per variant in parallel, each with the resolved text inline in its own empty directory, and appends provenance. |
+| `generate.sh <id> <count>` | Snapshots, then runs one backend call per variant in parallel, each passing the resolved text verbatim in its own empty directory, and appends provenance. |
 | `check-prompts.sh` | Flags the prose habits an image model cannot act on, plus unreferenced fragments. |
 
-All three take the image set directory from `IMAGESET_ROOT` (default: the current
+All take the image set directory from `IMAGESET_ROOT` (default: the current
 directory). `generate.sh` isolates the backend into one marked function; the
-shipped `codex exec` version is the reference implementation, swap it for another
-tool.
+shipped `codex exec` version is the reference implementation. **Swap it for a
+direct API call to the image tool wherever you can** — see below.
 
 Read a reference file only when the task reaches it:
 
@@ -108,6 +108,11 @@ The prompt tree exists to make generation deterministic. Resolving it inside the
 non-deterministic part gives that up. Where a step can be done by a script, do it
 in the script. The agent's only job is the one thing a script cannot do.
 
+**The agent between your prompt and the renderer will both fail to gather what
+you wrote, and edit what it gathered.** Neither failure appears in its output.
+Both appear only in the transcript. This section is the first failure; the next
+section is the second.
+
 Reference resolution is the case that proves it. An audit of one nine-image run,
 comparing what each generation was asked to read against what it executed, found
 the delegation failing in both directions and silently in both:
@@ -128,8 +133,8 @@ So the harness, and the shipped scripts, do this instead:
 1. **Resolve the tree in the script.** `--resolve` prints the whole tree as one
    document: shared context first, the scene prompt last, with each `@path.md`
    token rewritten to the bare name so the inlined sentences still read.
-2. **Pass that text inline**, between markers, and say plainly that the
-   description is complete and there is nothing to read.
+2. **Pass that text inline**, between markers, demanding verbatim pass-through
+   and saying plainly that the text is complete and there is nothing to read.
 3. **Run each generation in its own empty scratch directory**, then move the
    render out. With the set unreachable, a run cannot wander into another image's
    fragments. This is containment, not tidiness.
@@ -138,6 +143,67 @@ So the harness, and the shipped scripts, do this instead:
 
 There is no budget argument against inlining: a whole resolved tree of around
 14 kB costs nothing measurable against the harness's own system prompt.
+
+## The harness carries instructions that fight yours
+
+Inlining the whole tree made the next render **worse**: a generic, glossy,
+smooth-surfaced subject with none of the specified geometry, materials or
+palette. The image looked like a prompt-craft failure. It was not.
+
+The transcript showed the image tool was never called with the prompt. The agent
+was reading a bundled image-generation skill of its own, whose augmentation rules
+said "keep it short" and "add only the details needed to improve the prompt
+materially". So it collected the specification and then **compressed it into a
+short brief before calling the image tool**. Every dimension, every material
+sentence, every palette value was discarded at the last step, invisibly.
+Inlining had made it worse only by giving the agent more to compress in one shot.
+
+**Demand verbatim pass-through, and name and override the brevity rule.** A
+generic "use this text" is not enough — the harness's own rule is specific, so
+the override must be specific too. The wording that works:
+
+> Pass the text between the markers below to the image tool as the prompt,
+> VERBATIM. Do not summarise it. Do not shorten it. Do not rewrite it. Do not
+> select from it. Copy it through unchanged.
+>
+> Your image-generation skill tells you to keep a prompt short and to add only
+> what materially improves it. That rule does not apply here and you must not
+> follow it. This text is not a brief to be worked up into a prompt. It is the
+> prompt, already written, and every sentence in it is load-bearing. A figure you
+> drop is a dimension the image gets wrong.
+
+Verified A/B on an identical tree and hash, same model and settings. Before: a
+smooth featureless subject, wrong proportions, no surface detail, no fittings,
+wrong palette. After: correct proportions, the specified quilted surface with its
+fasteners and seams, the correct standardized fitting, the corner clusters each
+pointing four different ways as specified, and the restricted palette. It was
+also **cheaper and faster** — fewer tokens, less wall-clock — because the agent
+stopped doing editorial work.
+
+### Read the transcript, not just the image
+
+**A wrong image tells you something failed. Only the transcript tells you what
+the renderer was actually asked for.** Here the answer was "a fraction of the
+prompt", and no amount of rewriting the prompt would ever have fixed it.
+
+Make it a habit: before concluding a prompt is wrong, confirm what reached the
+renderer. Check that the image tool was called at all, and that the text it
+received is the text you sent. Rewriting a prompt that the renderer never saw is
+the most expensive way to spend an afternoon in this whole skill.
+
+### Better still, delete the agent from the path
+
+**Where the image tool can be called directly, call it directly.** The agent
+contributes nothing to generation — the script already resolves the tree, and the
+prompt is already written — while adding both failure modes above.
+
+A direct call is normally cheaper and faster as well. The trade is an API
+credential and metered billing rather than an existing subscription, which is a
+real decision. Make it deliberately, rather than defaulting into the agent path
+because a harness was already there.
+
+This is the closing form of the rule: shrink the agent's job to the thing no
+script can do. Here that turns out to be nothing at all.
 
 ## Workflow
 
@@ -152,9 +218,12 @@ There is no budget argument against inlining: a whole resolved tree of around
    receive, and a broken reference or a missing fragment shows up here rather
    than in a picture an hour later.
 6. Run `generate.sh <id> 3`. It snapshots and resolves the tree first.
-7. Review on the local surface: latest generation only, resolved prompt beside
+7. **Read one run transcript**, at least on the first batch of a set and after
+   any harness change. Confirm the image tool was called, and that the text it
+   received is the text you sent. The image alone cannot tell you this.
+8. Review on the local surface: latest generation only, resolved prompt beside
    the render, provenance on the card.
-8. Fix the fragment, not the image. Regenerate everything that fragment feeds.
+9. Fix the fragment, not the image. Regenerate everything that fragment feeds.
 
 ## The four sections, in this order, in every prompt
 
@@ -194,6 +263,7 @@ not by `lens: 85mm`.
 
 | symptom | cause | fix |
 | --- | --- | --- |
+| Renders ignore most of the specification no matter how the prompt is rewritten | an intermediate agent is summarising the prompt before the renderer sees it, obeying its own bundled "keep it short" rule | demand verbatim pass-through and override that rule by name; verify in the transcript that the image tool received the full text |
 | A render ignores everything its fragments specify — wrong proportions, no palette, invented scenery, yet plausible in itself | the run never opened the referenced files; resolution was left to the agent, which read only the scene file | resolve the tree in the script and pass the whole text inline. Do not trust the run's own report of what it read — it lists the tree it was meant to load |
 | A render contains an object no fragment in its tree mentions | the run read every file in the directory instead of the tree, and borrowed from another image | pass finished text, and generate in an empty scratch directory so the set is unreachable |
 | Surfaces look smooth, moulded, plastic — a product render | the fragment carries dimensions and no material noun | add a material sentence to every surface |
