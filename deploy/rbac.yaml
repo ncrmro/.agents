@@ -36,10 +36,18 @@ metadata:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
+
     name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro/.agents:ref:refs/heads/main:event:push:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
+    name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro-1/.agents-46:ref:refs/heads/main:event:push:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+
     name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro/.agents:ref:refs/heads/main:event:workflow_dispatch:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro-1/.agents-46:ref:refs/heads/main:event:workflow_dispatch:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -76,10 +84,18 @@ metadata:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
+
     name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro/.agents:ref:refs/heads/main:event:push:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
+    name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro-1/.agents-46:ref:refs/heads/main:event:push:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+
     name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro/.agents:ref:refs/heads/main:event:workflow_dispatch:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: oidc:forgejo:repo:ncrmro/.agents:subject:repo:ncrmro-1/.agents-46:ref:refs/heads/main:event:workflow_dispatch:workflow:ncrmro/.agents/.forgejo/workflows/deploy.yml@refs/heads/main
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
