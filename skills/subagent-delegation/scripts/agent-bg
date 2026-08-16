@@ -16,7 +16,7 @@ Examples:
   agent-bg fix-persist-sessions codex exec -m "${CODEX_MODEL:-gpt-5.6-sol}" \
     --sandbox workspace-write -C ../repo.worktrees/fix/persist-sessions "$(cat task.md)"
 
-  agent-bg review-pass bash -lc 'claude -p "/code-review" --permission-mode acceptEdits'
+  agent-bg review-pass bash -lc 'claude -p "/code-review" --permission-mode auto'
 USAGE
 }
 

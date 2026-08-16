@@ -11,6 +11,11 @@ the orchestrator via its log, and tracked in a `TASKS.md` local to the
 orchestrator's checkout. This keeps `main` and any in-flight human work untouched
 while workers run, and lets many lanes run concurrently.
 
+**Claude permission trap:** `--permission-mode dontAsk` is not automatic
+approval. It rejects actions that need approval. A headless Claude worker or
+reviewer SHOULD use `--permission-mode auto`. Use `bypassPermissions` only when
+the user explicitly authorizes a full permission bypass in an isolated worktree.
+
 ## The verified flow (one lane)
 
 1. **Cut a fresh JIT worktree off `origin/main`** at
@@ -27,11 +32,11 @@ while workers run, and lets many lanes run concurrently.
    and a final self-verification (status + log) to report.
 3. **Quality gate — separate review pass, also background shell tasks, in order:**
    - `/simplify`: either a claude subagent that invokes the `simplify` skill in
-     the worktree, or `claude -p "/simplify" --permission-mode acceptEdits` run
+     the worktree, or `claude -p "/simplify" --permission-mode auto` run
      from the worktree. Fixes are committed (amend single-commit lanes; separate
      `refactor: simplify per review` commit otherwise).
    - `/code-review`: **must** be `claude -p "/code-review" --permission-mode
-     acceptEdits` run from inside the worktree — the `code-review` skill is
+     auto` run from inside the worktree — the `code-review` skill is
      `disable-model-invocation` (the Skill tool refuses it) and the `review`
      skill is GitHub-PR-only. CONFIRMED findings get fixed and committed;
      PLAUSIBLE/advisory findings are reported to the coordinator, not churned on.
@@ -54,6 +59,33 @@ forever "Reading additional input from stdin..." — it appends piped stdin to
 the prompt. Always launch background workers with `</dev/null` (delegate.sh
 does this). A worker whose worktree stays clean for a long time with no log
 output is almost certainly stdin-hung: kill it and relaunch, don't wait.
+
+## Claude permission modes
+
+- `auto` — default for unattended headless workers and review passes. Claude
+  classifies each operation and automatically approves suitable operations.
+- `acceptEdits` — accepts file edits. It is not general automatic approval.
+- `dontAsk` — never prompts and rejects operations that require approval. Do not
+  use it as an automatic mode.
+- `bypassPermissions` — bypasses all Claude permission checks. Use it only after
+  explicit user authorization and only in an isolated worktree.
+
+For an adversarial read-only Opus review, make both the available-tool set and
+the allowed-tool set explicit:
+
+```sh
+claude -p "<review prompt>" \
+  --model opus \
+  --effort high \
+  --permission-mode auto \
+  --no-session-persistence \
+  --tools "Read,Grep,Glob" \
+  --allowedTools "Read,Grep,Glob"
+```
+
+Claude's permission mode does not control the orchestrator's filesystem or
+command sandbox. If an outer approval service rejects the process launch,
+changing Claude's permission mode cannot approve that outer operation.
 
 ## Watching and resuming workers
 
@@ -78,9 +110,9 @@ lanes to need a conflict pass — that is normal, delegate it (step 4).
 
 ## Safety: autonomy and landing
 
-- Workers run with their normal approval prompts unless the run is explicitly
-  authorized as unattended (`--permission-mode bypassPermissions` /
-  `--full-auto`), and any such bypass is confined to the throwaway worktree.
+- Headless Claude workers use `--permission-mode auto`. A full permission bypass
+  (`--permission-mode bypassPermissions` / `--full-auto`) requires explicit
+  authorization and MUST remain confined to the throwaway worktree.
 - Landing is never silent: it happens only when the run was explicitly
   authorized to auto-land (e.g. the user approved "auto-merge when the gate is
   clean") or on an explicit per-lane choice. Shared/org repos always land via

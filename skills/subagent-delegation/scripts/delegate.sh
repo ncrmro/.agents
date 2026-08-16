@@ -22,8 +22,8 @@
 #   codex:  codex exec resume --last -C <worktree>
 #   claude: (cd <worktree> && claude -p --resume)
 #
-# SAFETY: by default the worker keeps its normal approval prompts; --autonomous
-# disables them FOR THE WORKER ONLY inside this throwaway worktree. Landing is
+# SAFETY: Claude uses automatic approval by default for headless operation.
+# --autonomous bypasses checks FOR THE WORKER ONLY inside this throwaway worktree. Landing is
 # never silent: it requires an explicit --land value or an interactive choice,
 # and defaults to leaving the branch unmerged.
 set -euo pipefail
@@ -57,20 +57,20 @@ case "$branch" in
 esac
 
 # ---- worker invocation ------------------------------------------------------
-# Approval-bypass flags are opt-in via --autonomous and confined to the worker
-# in this throwaway worktree; the default keeps each agent's normal prompts on.
+# Claude auto mode is the headless default. Approval-bypass flags are opt-in via
+# --autonomous and confined to the worker in this throwaway worktree.
 codex_model="${CODEX_MODEL:-gpt-5.6-sol}"
-claude_auto=(); codex_auto=()
+claude_permission=(--permission-mode auto); codex_auto=()
 if [ "$autonomous" = 1 ]; then
-  claude_auto=(--permission-mode bypassPermissions)
+  claude_permission=(--permission-mode bypassPermissions)
   codex_auto=(${CODEX_AUTONOMOUS_FLAGS:---full-auto})
 fi
 run_agent() {
   local prompt="$1"
   case "$agent" in
     codex)     codex exec -m "$codex_model" --sandbox workspace-write -C "$PWD" "${codex_auto[@]}" "$prompt" ;;
-    claude)    claude -p "$prompt" "${claude_auto[@]}" ;;
-    outfitter) outfitter run --agent claude -- -p "$prompt" "${claude_auto[@]}" ;;
+    claude)    claude -p "$prompt" "${claude_permission[@]}" ;;
+    outfitter) outfitter run --agent claude -- -p "$prompt" "${claude_permission[@]}" ;;
     *) die "unknown agent: $agent" ;;
   esac
 }
@@ -145,12 +145,12 @@ gate_status=0
     git add -A && git commit -m "$1"
   }
   echo "delegate: /simplify" >&2
-  claude -p "/simplify" "${claude_auto[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
+  claude -p "/simplify" "${claude_permission[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
   commit_gate_fixes "refactor: simplify per review"
   for pass in 1 2 3; do
     before="$(git rev-parse HEAD)"
     echo "delegate: /code-review (pass $pass)" >&2
-    claude -p "/code-review" "${claude_auto[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
+    claude -p "/code-review" "${claude_permission[@]}" ${GATE_MODEL:+--model "$GATE_MODEL"}
     commit_gate_fixes "fix: apply code-review findings"
     [ "$(git rev-parse HEAD)" = "$before" ] && exit 0
   done

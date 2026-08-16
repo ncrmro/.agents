@@ -112,6 +112,29 @@ device selection is the `DOCLING_DEVICE` environment variable (`auto`, `cpu`,
 Docling raises instead of silently falling back to CPU — so prefer it over
 `auto` once GPU is proven.
 
+### Managed-sandbox visibility gate
+
+**Do not treat a failed probe inside a managed sandbox as a broken ROCm
+installation.** A sandbox can hide `/dev/kfd` and `/dev/dri` while the host GPU,
+user groups, ROCm runtime, and PyTorch wheels are all correct. This failure
+looks like `torch.cuda.is_available() == False` and `device_count() == 0`.
+
+Check device visibility before you reinstall or replace anything:
+
+```bash
+ls -ld /dev/kfd /dev/dri 2>/dev/null
+rocminfo 2>&1 | head -20
+```
+
+- If `/dev/kfd` and `/dev/dri` are absent, rerun the positive PyTorch probe
+  with approved host-device access. Do not reinstall ROCm or PyTorch first.
+- If the host probe succeeds, run every Docling command that needs the GPU
+  with the same host-device access and `DOCLING_DEVICE=cuda`.
+- If the host probe fails while the device nodes are visible, continue with
+  the ROCm version, wheel, and ABI checks below.
+- Use the CPU fallback only after the host-access probe fails. Hidden device
+  nodes alone do not justify a CPU fallback.
+
 Verified working on this machine: AMD Radeon RX 9070 XT (RDNA4, gfx1201, ROCm
 7.2.3). ROCm-built PyTorch exposes AMD GPUs through the same `torch.cuda` API
 CUDA uses (HIP aliases as CUDA for compatibility), so `DOCLING_DEVICE=cuda`
@@ -191,9 +214,9 @@ also selects the ROCm-backed AMD GPU — this is expected, not a bug.
    RapidOCR's `Using GPU device with ID: 0` — both appear per-model-load, so
    look for them near the top of the run, not just once.
 
-Fallback: if the ROCm wheel install or `rocminfo` doesn't produce a positive
-probe, just set `DOCLING_DEVICE=cpu` (or unset it). The ROCm torch build runs
-fine on CPU too — no need to reinstall the CUDA-build torch — so CPU-only
+Fallback: if the ROCm wheel install or a **host-access** probe does not produce
+a positive result, set `DOCLING_DEVICE=cpu` (or unset it). The ROCm torch build
+runs fine on CPU too — no need to reinstall the CUDA-build torch — so CPU-only
 remains the prior working state and an acceptable outcome.
 
 ## Wiki handoff

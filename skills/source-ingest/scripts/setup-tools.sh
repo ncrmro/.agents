@@ -39,7 +39,7 @@ fi
 printf 'Installing core tools into %s\n' "$profile"
 nix profile add --profile "$profile" \
   nixpkgs#ffmpeg nixpkgs#jq nixpkgs#uv nixpkgs#curl \
-  nixpkgs#libxcb nixpkgs#libglvnd nixpkgs#glib nixpkgs#zlib \
+  nixpkgs#libxcb nixpkgs#libglvnd nixpkgs#glib.out nixpkgs#zlib \
   nixpkgs#gcc.cc.lib
 nix profile add --profile "$profile" --priority 4 \
   nixpkgs#whisper-cpp-vulkan

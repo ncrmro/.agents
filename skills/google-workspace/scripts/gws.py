@@ -26,6 +26,8 @@ from pathlib import Path
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/calendar.readonly",
+    # Calendar event creation/updates only — Gmail and Contacts stay read-only.
+    "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/contacts.readonly",
 ]
 
@@ -243,6 +245,23 @@ def cmd_calendar_events(args) -> None:
     )
 
 
+def cmd_calendar_create(args) -> None:
+    svc = service(args.account, "calendar", "v3")
+    body = {
+        "summary": args.summary,
+        "start": {"dateTime": args.start, "timeZone": args.timezone},
+        "end": {"dateTime": args.end, "timeZone": args.timezone},
+    }
+    if args.description:
+        body["description"] = args.description
+    if args.attendee:
+        body["attendees"] = [{"email": a} for a in args.attendee]
+    event = svc.events().insert(calendarId=args.calendar, body=body, sendUpdates="all" if args.attendee else "none").execute()
+    out({"id": event["id"], "htmlLink": event.get("htmlLink"), "summary": event.get("summary"),
+         "start": event.get("start"), "end": event.get("end"),
+         "attendees": [a.get("email") for a in event.get("attendees", [])]})
+
+
 def cmd_contacts_list(args) -> None:
     svc = service(args.account, "people", "v1")
     people = []
@@ -321,6 +340,17 @@ def main() -> None:
     sp.add_argument("--time-max", help="RFC3339 end; overrides --days window end")
     sp.add_argument("--max", type=int, default=100)
     sp.set_defaults(fn=cmd_calendar_events)
+
+    sp = sub.add_parser("calendar-create", help="create a calendar event")
+    sp.add_argument("account")
+    sp.add_argument("summary")
+    sp.add_argument("--start", required=True, help="RFC3339 local datetime, e.g. 2026-08-14T11:30:00")
+    sp.add_argument("--end", required=True)
+    sp.add_argument("--timezone", default="America/Chicago")
+    sp.add_argument("--calendar", default="primary")
+    sp.add_argument("--description")
+    sp.add_argument("--attendee", action="append", help="attendee email (repeatable; sends invitations)")
+    sp.set_defaults(fn=cmd_calendar_create)
 
     sp = sub.add_parser("contacts-list", help="list contacts")
     sp.add_argument("account")
