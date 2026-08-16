@@ -105,6 +105,22 @@ jobs:
       # resources whose API group already changed once, so the deploy step
       # and the CRDs it patches move as one bump. Fully qualified because a
       # bare `uses:` resolves against the Forgejo instance, not github.com.
+      # TEMPORARY diagnostic: capture the deploy identity's server-side view
+      # as an artifact, since this instance exposes no step logs API. Remove
+      # after the first green deploy.
+      - name: Capture identity diagnostics
+        run: |
+          export KUBECONFIG="${{ runner.temp }}/deploy-kubeconfig"
+          d="${{ runner.temp }}/diag"; mkdir -p "$d"
+          kubectl auth whoami -o json > "$d/whoami.json" 2>&1 || true
+          kubectl get organizations.aioutfitter.com ncrmro -o name > "$d/org.txt" 2>&1 || true
+          kubectl get agents.aioutfitter.com luce -o name > "$d/agent.txt" 2>&1 || true
+          kubectl auth can-i patch organizations.aioutfitter.com --all-namespaces > "$d/cani.txt" 2>&1 || true
+      - name: Upload identity diagnostics
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: identity-diag
+          path: ${{ runner.temp }}/diag/
       - name: Deploy the catalog revision
         uses: https://github.com/ai-outfitter/agent-operator/actions/deploy-catalog@b4228496b6b3dfd26b98c68e49c433f5d631b0c1
         with:
