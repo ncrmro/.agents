@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["saved", "path", "size", "fragments", "error"],
+  "properties": {
+    "saved": {
+      "type": "boolean",
+      "description": "True only if the image file was written to the requested path."
+    },
+    "path": {
+      "type": "string",
+      "description": "The path the image was saved to, relative to the image set directory."
+    },
+    "size": {
+      "type": "string",
+      "description": "Pixel dimensions of the generated image, as WIDTHxHEIGHT."
+    },
+    "fragments": {
+      "type": "array",
+      "description": "Every prompt file read for this generation, including the top level prompt and each file reached through an @ reference, relative to the image set directory.",
+      "items": { "type": "string" }
+    },
+    "error": {
+      "type": ["string", "null"],
+      "description": "Why the image was not generated. Null when saved is true."
+    }
+  }
+}
