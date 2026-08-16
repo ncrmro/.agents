@@ -16,6 +16,49 @@ it never said what was wanted, so the model filled the gap with its default.
 Write the second. A prohibition earns its place only after a render actually
 fails, and then it names that one failure and not a class of them.
 
+## Resolving an ambiguity invents a fact
+
+The rule above tells you to fill the silences. This one tells you what filling a
+silence costs.
+
+An image asserts things about the world. An assertion the project does not hold
+is a defect, even when the image is beautiful. So filling a silence is never a
+neutral edit: it commits the project to a claim.
+
+A prompt described an object being worked on, but never said how the object was
+held. The renders put the attachment point somewhere different every time. The
+fix looked obvious: name one attachment and be done. The attachment chosen was
+physically sound and drew consistently. It was also operationally false, because
+the project's own argument was that this class of object never attaches to the
+thing it services. The image then contradicted the text beside it. Two
+independent reviewers had endorsed the fix. Both were reasoning about physics,
+and neither was checking the claim against the project's stated position.
+
+A physically plausible answer is not necessarily the true one, and the difference
+is invisible from inside the prompt tree. So:
+
+1. **Read the surrounding material before you fill the silence.** Grep the
+   captions, the body copy, the design notes and the argument the images serve.
+   The claim you are about to make is often already made, or already denied.
+2. **Record the constraint where prompts get written**, not only in the prompt
+   you fixed. A prompt-local fix is forgotten by the next agent, who meets the
+   same silence and resolves it the same wrong way.
+
+## Negative constraints belong in the notes, not in the prompt
+
+This is the one place a prohibition is the right tool, and the distinction is
+worth stating outright.
+
+- **Inside a prompt**, a prohibition fails, because the reader is a model
+  choosing what to draw and every alternative stays open. State the fact.
+- **Inside the set's agent notes**, a prohibition works, because the reader is an
+  agent choosing what to write, and a written rule closes a decision.
+
+Give the notes a section saying what the subject **never** does. Name the
+tempting wrong branch and say why it is wrong. A constraint that only states the
+truth does not prevent the repeat; a constraint that names the attractive error
+does.
+
 ## Name a material, not only a size
 
 A fragment whose only content is dimensions renders as product visualisation:

@@ -131,8 +131,15 @@ for n in "${names[@]}"; do
 	took=$(( $(date +%s) - started ))
 	[ "$started" -eq 0 ] && took=-1
 
+	# Backend specific. codex prints "tokens used" and then the count on the next
+	# line. Another backend's log needs its own parse here, next to the backend
+	# call it belongs to. Null is a valid value; a wrong number is not.
+	tokens="$(grep -A1 -m1 '^tokens used' "$OUT/.log-${n%.png}-$HASH.txt" 2>/dev/null \
+		| tail -1 | tr -cd '0-9')"
+
 	IMAGE="$n" PROMPT="$HASH" AT="$(date -Iseconds)" OUT="$OUT" \
 	RUN_MODEL="$RUN_MODEL" EFFORT="$EFFORT" RUN_FAST="$RUN_FAST" TOOK="$took" \
+	TOKENS="${tokens:-}" \
 	python3 - "$result" <<'PY' >> "$OUT/provenance.jsonl"
 import json, os, sys
 row = {

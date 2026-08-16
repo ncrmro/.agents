@@ -1,6 +1,6 @@
 ---
 name: generated-imagery
-description: Produce a set of generated images that look like one world — a prompt tree of shared fragments, content-addressed snapshots so a regression can be diffed rather than guessed at, a parallel generation harness with per-render provenance, and a review surface. Use when generating illustrations, renders, or concept imagery for a deck, site, game, or product; when images in a set drift apart between runs; when a render comes back looking like smooth plastic, at the wrong scale, or missing something the prompt asked for; or when setting up image generation for a project.
+description: Produce a set of generated images that look like one world — a prompt tree of shared fragments, content-addressed snapshots so a regression can be diffed rather than guessed at, a parallel generation harness with per-render provenance, and a review surface. Use when generating illustrations, renders, or concept imagery for a deck, site, game, or product; when images in a set drift apart between runs; when a render comes back looking like smooth plastic, at the wrong scale, or missing something the prompt asked for; when an image asserts something that contradicts the text beside it; or when setting up image generation for a project.
 ---
 
 # Generated imagery
@@ -48,10 +48,35 @@ saying what it is, how it is fastened, and what it does under a raking light —
 **and put the camera off square with the key light raking**, or the texture is
 geometrically invisible and no material word survives.
 
+## An image set is a set of claims
+
+An image asserts things about the world. An assertion the project does not hold
+is a defect, even when the image is beautiful. Give an image set the same factual
+discipline you give prose.
+
+**Resolving an ambiguity invents a fact.** Filling a silence in a prompt is not a
+neutral edit. It commits the project to an assertion, and a physically plausible
+answer is not necessarily the true one. That difference is invisible from inside
+the prompt tree, so reviewers who reason only about physics endorse the error.
+
+Before you fill a silence about how something works, read what the surrounding
+material already claims: the captions, the body copy, the design notes. Then
+record the constraint in the set's agent notes, not only in the prompt you fixed.
+A prompt-local fix is forgotten by the next agent, who meets the same silence and
+resolves it the same wrong way.
+
+**Give the agent notes a "what this subject never does" section.** A negative
+constraint is the wrong tool inside a prompt, where it leaves every alternative
+open. It is the right tool in the notes that govern how prompts get written,
+because there the reader is an agent choosing what to write rather than a model
+choosing what to draw. Name the tempting wrong branch and say why it is wrong. A
+constraint that only states the truth does not stop the repeat.
+
 ## The tree
 
 ```
 <image set>/
+  AGENTS.md            how prompts get written here, and what the subject never does
   design.md            the visual language for the whole set
   prompts/<id>.md      one file per image. The whole file is the prompt.
   fragments/<name>.md  one file per subject, one per reusable component
@@ -126,6 +151,7 @@ not by `lens: 85mm`.
 | A component renders at the wrong size | a figure with no familiar-object anchor | keep the figure, add the anchor |
 | Two parts both wrong, but consistent with each other | the anchor pointed at another part of the same subject | anchor to something outside the subject |
 | A fitting or attachment point moves between renders | the prompt named neither the fitting nor the surface it sits on | name the fitting in use, name its face, and say where the camera stands relative to both |
+| The image contradicts the text beside it, or asserts something untrue about how the subject works | a silence in the prompt was filled with a plausible invention, which committed the project to a claim it does not hold | check the claim against the project's own material before you fill the silence, then record the constraint in the set's agent notes |
 | An arrangement renders differently every time | the prompt describes something physically impossible, so there is no right answer to converge on | check the rigging; one holder holds one thing at a time |
 | A feature the prompt demands is not visible | it lives on a face the camera cannot see, so the prompt contradicts itself and the model resolves it by moving the feature | put the feature on more faces, or stop demanding it in this frame |
 | The look regressed after a cleanup pass | a sentence was deleted, not a model changed | diff the frozen snapshot of the last good render against the current tree |

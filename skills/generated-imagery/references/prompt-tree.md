@@ -4,6 +4,7 @@
 
 ```
 <image set>/
+  AGENTS.md            how prompts get written here, and what the subject never does
   design.md            the visual language for the whole set
   prompts/<id>.md      one file per image. The whole file is the prompt.
   fragments/<name>.md  one file per subject, one per reusable component
@@ -28,6 +29,23 @@ Write `@<relative-path>.md` inside the sentence that needs it.
 The tooling matches `@` followed by a path ending in `.md`, anywhere on a line.
 Both the snapshot script and the review surface resolve the whole tree, so the
 same syntax drives generation, freezing and review.
+
+## The agent notes
+
+One file governing how prompts get written in this set. It is read by an agent,
+not by an image model, so it uses ordinary prose and it may prohibit things.
+
+It carries:
+
+- The prose rules the set follows, and any rule it deliberately breaks.
+- What the subject **is**: the one paragraph that says what a reader must take
+  from every image of it.
+- **What the subject never does.** Every claim the images must not make, each one
+  naming the tempting wrong branch and why it is wrong. This section is what
+  stops the next agent from resolving a silence the same wrong way; see the
+  "Resolving an ambiguity invents a fact" section in `prompt-craft.md`.
+- How the set treats a disagreement between its own figures and a vendor's.
+- The commands: lint, snapshot, generate, review.
 
 ## The design language file
 
