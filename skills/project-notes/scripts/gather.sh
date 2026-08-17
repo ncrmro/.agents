@@ -89,12 +89,29 @@ main() {
     exit 0
   fi
 
-  # section TITLE COMMAND… — heading plus rows, or "- none" when empty/failed.
+  # section TITLE COMMAND… — heading plus rows, "- none" when the query
+  # answered with nothing, or a degraded row when it could not answer at all.
+  #
+  # These two must never render the same. A forge that replies 503 produces an
+  # empty list, and "- none" reads as "nothing is open" — so refreshing a page's
+  # Open Tasks wholesale from that output deletes every open row, with no error
+  # anywhere to notice. Piping straight to grep also hid the status, since a
+  # pipeline reports grep's exit code and not the query's.
   section() {
     local title=$1; shift
+    local out status errfile
+    errfile=$(mktemp)
+    out=$("$@" 2>"$errfile"); status=$?
     echo
     echo "### $title"
-    "$@" 2>/dev/null | grep . || echo "- none"
+    if [ "$status" -ne 0 ]; then
+      degraded "$title unavailable — $(head -1 "$errfile" | cut -c1-200)"
+    elif printf '%s' "$out" | grep -q .; then
+      printf '%s\n' "$out" | grep .
+    else
+      echo "- none"
+    fi
+    rm -f "$errfile"
   }
 
   gh_prs() {
