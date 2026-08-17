@@ -1,14 +1,15 @@
 ---
 name: keystone-development
-description: Develop, architect, install, deploy, test, and diagnose Keystone OS through the ks.systems/os platform repo, ncrmro/ks-config consumer flake, and ncrmro/dotfiles. Use for ks-dev build/switch workflows; deciding whether dotfiles, Home Manager, NixOS, or Kubernetes owns a change; local Keystone module iteration; remote NixOS work on real hardware; nixos-anywhere and disko installs; Secure Boot and LUKS enrollment; or build-vm/direct-image/libvirt/microVM testing.
+description: Develop, architect, install, deploy, test, and diagnose Keystone through the ks.systems/terminal, ks.systems/desktop, ks.systems/os, ncrmro/ks-config, and ncrmro/dotfiles repositories. Use for ks-dev workflows; deciding whether dotfiles, Home Manager, NixOS, or Kubernetes owns a change; local Keystone module iteration; remote NixOS work; installation; Secure Boot and LUKS enrollment; or VM testing.
 ---
 
 # Keystone development
 
-Treat `ks.systems/os` as the reusable platform and `ks-config` as the fleet consumer
-and deployment entry point. Start with the lowest validation tier that can
-exercise the behavior; use real hardware only for behavior that depends on
-physical firmware or devices.
+Treat `ks.systems/terminal`, `ks.systems/desktop`, and `ks.systems/os` as
+composable products. Treat `ks-config` as the fleet consumer and deployment
+entry point. Treat `ncrmro/dotfiles` as the owner of live editable defaults.
+Start with the lowest validation tier that can exercise the behavior. Use real
+hardware only for behavior that depends on physical firmware or devices.
 
 ## Load the relevant reference
 
@@ -51,7 +52,11 @@ Before editing or deploying:
    work.
 3. Identify the target host or VM configuration and its flake output.
 4. Decide which repo owns the change:
-   - reusable option, module, template, installer, or test harness → `keystone`
+   - reusable terminal option, package, service, or starter template →
+     `ks.systems/terminal`
+   - reusable graphical option, package, service, or starter template →
+     `ks.systems/desktop`
+   - reusable OS option, module, installer, or test harness → `ks.systems/os`
    - editable user configuration payload → `dotfiles`
    - host hardware, fleet policy, secrets wiring, or per-user override →
      `ks-config`
@@ -61,9 +66,18 @@ Before editing or deploying:
    `nix develop --command <command>`; do not install tools globally or use
    `npx`.
 
-When both repos mention a feature, implement its behavior in the repository
-identified by step 4. Limit `ks-config` to host selection, fleet policy, secrets
-wiring, and per-user overrides.
+When multiple repositories mention a feature, implement its behavior in the
+repository identified by step 4. Limit `ks-config` to host selection, fleet
+policy, secrets wiring, Stow-package selection, and per-user overrides.
+
+For terminal and desktop configuration, preserve this dependency direction:
+
+`dotfiles ← terminal ← desktop ← os ← ks-config`
+
+The arrow means that the product on the right consumes the contract on the
+left. Desktop MUST depend on terminal. Terminal MUST support headless hosts.
+Nix MUST own packages and runtime wiring. Dotfiles MUST own the editable files
+after the initial seed operation.
 
 ## Choose the validation tier
 
@@ -99,8 +113,8 @@ For a Keystone change consumed by a `ks-config` host:
    safe to activate live.
 6. After a successful activation, verify the runtime behavior and that the
    live system and system profile both resolve to the intended closure.
-7. Commit and push Keystone first when publishing. Then update only the
-   `keystone` input in `ks-config`, rebuild, and commit the lock update.
+7. Publish from the dependency edge toward the consumer: terminal, desktop,
+   OS, and then `ks-config`. Update only the affected input at each edge.
 
 Never run a bare `nix flake update` in `ks-config`. Update only the intended
 input.

@@ -9,8 +9,10 @@ override them.
 | Layer | Owner | Mechanism |
 | --- | --- | --- |
 | Human-authored user configuration | `ncrmro/dotfiles` | Plain files organized as GNU Stow packages |
-| User packages, dependencies, activation, and machine selection | Home Manager through Nix | Install tools and restow the selected dotfile packages |
-| Reusable OS and user integration | `ncrmro/keystone` | Reusable NixOS and Home Manager modules |
+| Terminal packages, services, runtime wiring, and starter defaults | `ks.systems/terminal` | Standalone Home Manager product for Linux and macOS |
+| Graphical packages, services, runtime wiring, and starter defaults | `ks.systems/desktop` | Desktop product that depends on terminal |
+| Reusable OS integration | `ks.systems/os` | Reusable NixOS modules and product composition |
+| Package installation, activation, and Stow selection | Home Manager through Nix | Install tools and restow selected dotfile packages |
 | Host identity and fleet policy | `ncrmro/ks-config` | Consumer flake, host modules, hardware values, secret wiring, locked inputs |
 | Linux operating system | NixOS | Boot, storage, networking, security, users, system services, and the Kubernetes substrate |
 | Application build and deployment | Application repository | Nix-built OCI image plus Kubernetes manifests, Kustomize, or Helm values |
@@ -33,6 +35,16 @@ Use Nix and Home Manager to:
 - apply or restow links during activation;
 - configure user services, session integration, and machine-specific values;
 - make the result reproducible from a fresh machine.
+
+Use the terminal or desktop seed command to create missing defaults in the
+dotfiles repository. The seed operation MUST preserve existing files by
+default. It is initialization, not continuous configuration management.
+
+The terminal product MUST work without the desktop product. It owns terminal
+theming, including Zellij adapters. The desktop product MUST depend on terminal
+and MAY extend the theme contract with graphical adapters and reload hooks.
+The OS product composes these products. It MUST NOT duplicate their modules or
+provide package compatibility aliases.
 
 If a Stow package owns an application's configuration directory, install the
 application as a package and disable Home Manager's generated configuration for

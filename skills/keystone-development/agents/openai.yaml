@@ -1,4 +1,4 @@
 interface:
   display_name: "Keystone Development"
   short_description: "Design, develop, and validate Keystone systems"
-  default_prompt: "Use $keystone-development to choose the owning dotfiles, Home Manager, NixOS, or Kubernetes layer, then develop, deploy, or diagnose the Keystone change."
+  default_prompt: "Use $keystone-development to choose the owning dotfiles, terminal, desktop, OS, consumer, or Kubernetes layer, then develop, deploy, or diagnose the Keystone change."
