@@ -21,9 +21,16 @@ extensions:
   # exact `git:...channels@<sha>` line to pre-install the extension — keep the
   # pin on one line.
   - git:github.com/ai-outfitter/channels@856f1d4dee72ab5de9754d4417b1993df2215ecb
-# The resident pod needs an explicit model (its Pi auth is seeded on the PVC);
-# locally this is an override you can bypass per-run.
-model: openai-codex/gpt-5.6-luna
+# The resident pod needs an explicit model. This is the `openai` provider from
+# models.json, keyed by $OPENAI_API_KEY — one key per resident agent, so
+# OpenAI's usage dashboard attributes spend per agent. The pod gets it from the
+# `luce-openai` Secret; locally it comes from your shell, and you can override
+# the model per-run.
+#
+# Moved off openai-codex/gpt-5.6-luna: that provider authenticates against the
+# shared Codex subscription seeded on the PVC, which has no per-agent cost
+# attribution and stopped every run dead once its usage limit was reached.
+model: openai/gpt-5.6-sol
 thinking: high
 ---
 
