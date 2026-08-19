@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() {
+  printf 'chrome-devtools-mcp-personal-xdg: %s\n' "$*" >&2
+  exit 1
+}
+
+desktop_id=""
+if command -v xdg-settings >/dev/null 2>&1; then
+  desktop_id="$(xdg-settings get default-web-browser 2>/dev/null || true)"
+fi
+if [[ -z "$desktop_id" ]] && command -v xdg-mime >/dev/null 2>&1; then
+  desktop_id="$(xdg-mime query default x-scheme-handler/http 2>/dev/null || true)"
+fi
+
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+case "$desktop_id" in
+  chromium-browser.desktop | chromium.desktop)
+    user_data_dir="$config_home/chromium"
+    ;;
+  google-chrome.desktop | com.google.Chrome.desktop)
+    user_data_dir="$config_home/google-chrome"
+    ;;
+  *)
+    fail "The XDG default browser does not have a supported Chrome profile: ${desktop_id:-<unset>}"
+    ;;
+esac
+
+[[ -d "$user_data_dir" ]] || fail "The personal browser profile does not exist: $user_data_dir"
+
+if [[ "${1:-}" == "--print-profile" ]]; then
+  printf '%s\n' "$user_data_dir"
+  exit 0
+fi
+
+exec npx -y chrome-devtools-mcp@1.6.0 \
+  --autoConnect \
+  --userDataDir "$user_data_dir" \
+  --no-performance-crux \
+  --no-usage-statistics \
+  "$@"
