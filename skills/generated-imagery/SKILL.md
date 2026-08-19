@@ -16,7 +16,7 @@ a prompt. The craft rules below improve one image too.
 | `snapshot-prompt.py --resolve <id>` | Prints the whole tree as one document, ready to send. Writes nothing. |
 | `generate.sh <id> <count>` | Snapshots, then runs one backend call per variant in parallel, each passing the resolved text verbatim in its own empty directory, and appends provenance. |
 | `check-prompts.sh` | Flags the prose habits an image model cannot act on, plus unreferenced fragments. |
-| `submit-web.mjs --site chatgpt\|gemini [--image f]…` | Pastes a resolved prompt (stdin or `--prompt-file`), attaches images, submits in a real Chrome window, waits, prints the conversation URL. |
+| `submit-web.mjs --site chatgpt\|gemini [--account e] [--image f]…` | Pastes a resolved prompt (stdin or `--prompt-file`), attaches images, submits in the user's Chrome over CDP, waits, prints the conversation URL, and appends a provenance line. Gemini requires the account; `--image` paths are cwd-relative. |
 
 All take the image set directory from `IMAGESET_ROOT` (default: the current
 directory). `generate.sh` isolates the backend into one marked function; the
@@ -228,14 +228,20 @@ snapshot-prompt.py --resolve IMG-03 | submit-web.mjs --site chatgpt --image phot
   fails by silently falling back to the default account, which would put the
   prompt in the wrong account's history — so a mismatch is a hard error, not a
   warning.
-- The conversation URL it prints is what an import step consumes; creating a
-  share link stays manual.
+- The conversation URL goes to stdout and into a provenance row in
+  `$IMAGESET_ROOT/out/provenance.jsonl` (the file generate.sh appends to),
+  keyed by the sha256 of the submitted text — so a web render still ties back
+  to the tree that produced it. Downloading the render and creating a share
+  link stay manual.
 - Selectors were read from the live DOM (2026-08-19): ChatGPT
-  `#prompt-textarea` / `#composer-submit-button` / `[data-testid="stop-button"]`,
-  Gemini `rich-textarea div.ql-editor` / `button[aria-label="Send message"]`,
-  and Gemini's `input[type=file]` exists only while the "Upload & tools" menu
-  is open. When a site ships a redesign, re-read the DOM before rewriting the
-  script's logic.
+  `#prompt-textarea` / `#composer-submit-button`, Gemini
+  `rich-textarea div.ql-editor` / `button[aria-label="Send message"]`, and
+  Gemini's `input[type=file]` exists only while the "Upload & tools" menu is
+  open. The two streaming stop selectors (`[data-testid="stop-button"]`,
+  `button[aria-label*="Stop"]`) are inferred, not observed — the script says
+  so on stderr when one never appears; confirm them on the first real run.
+  When a site ships a redesign, re-read the DOM before rewriting the script's
+  logic.
 
 ## Workflow
 
