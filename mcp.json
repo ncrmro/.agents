@@ -46,6 +46,13 @@
       "env": {
         "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"
       }
+    },
+    "chrome-personal": {
+      "type": "stdio",
+      "command": "chrome-devtools-mcp-personal-xdg",
+      "env": {
+        "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"
+      }
     }
   }
 }
