@@ -1,8 +1,7 @@
 # Tells of a writer performing the act of writing
 
-> Not derived from the Wikipedia guide. These three patterns were found surviving
-> a full four-lens review of an assistant-drafted white paper, which is why they
-> are recorded separately: the Wikipedia-derived lenses do not name them.
+> Not derived from the Wikipedia guide, and not under its licence. The four
+> generated lens files do not name these three patterns.
 
 All three share one root cause. Instead of making a point, the sentence stands
 beside the point and comments on it — on where it sits in the document, on how
@@ -21,7 +20,7 @@ the previous pass left behind.
 > Words to watch: ***the second half of the argument*, *this section*, *the point
 > of this document*, *as this paper shows*, *the structure here*, *this is the
 > clearest/strongest X in the document*, *what follows*, *the argument runs*,
-> *the tier is*, *this framing*, *this is where X becomes Y***
+> *the X here is*, *what this section is doing is***
 
 The sentence describes the document's own architecture, or ranks one of its parts
 against the others, rather than saying the thing. A reader who understands the
@@ -44,9 +43,9 @@ own work, and the reader will make that judgment themselves.
 
 > One asset is not on that list and is worth naming separately.
 
-**Action for the reviewer:** state the actual point directly, without introducing
-how the point functions within the document. If removing the meta-sentence leaves
-the following sentence standing on its own, the meta-sentence was scaffolding.
+**Fix to recommend:** state the point directly, without introducing how it
+functions within the document. If removing the meta-sentence leaves the following
+sentence standing on its own, the meta-sentence was scaffolding.
 
 - *The second half of the argument is structural. A constellation of pods holding fixed positions is a set of powered, station-keeping assets.* → *A constellation of pods holding fixed positions is a set of powered, station-keeping assets.*
 - *One asset is not on that list and is worth naming separately. Because no standard exists…* → *Because no standard exists…*
@@ -65,10 +64,8 @@ of the one intended: a reader who is being told the passage is honest starts
 wondering about the passages that carried no such label, and the sentence acquires
 a defensive edge the facts did not need.
 
-This pattern is a particular hazard when an assistant is asked to write in a
-grounded, unvarnished, founder-like register. Reaching for the *signals* of that
-register — terseness, self-deprecation, declared frankness — produces a
-performance of plain speech rather than plain speech.
+This is a hazard when writing in a blunt, founder-like register: reaching for the
+signals of plain speech performs it instead of doing it.
 
 **Examples**
 
@@ -79,11 +76,10 @@ performance of plain speech rather than plain speech.
 
 > …and the honest account of which of those the company builds.
 
-**Action for the reviewer:** delete the qualifier and let the fact carry the
-credibility. The facts in a passage like this are usually strong — an unflattering
-number, a named gap, an admission of no contact — and they are doing all the work
-already. If deleting the qualifier makes the sentence weaker, the problem is that
-the fact was thin, and the fix is a better fact rather than a louder frame.
+**Fix to recommend:** delete the qualifier and let the fact carry the
+credibility. The facts are usually already doing the work. If deleting the
+qualifier makes the sentence weaker, the fact was thin, and the fix is a better
+fact rather than a louder frame.
 
 - *Both are Produces for a reason worth stating plainly: neither has grounding in current work.* → *Both are Produces, not Builds, because neither has grounding in current work.*
 - *Two founders, no payroll, no revenue. That is the whole of it.* → *Two founders, no payroll, no revenue.*
@@ -98,34 +94,25 @@ the fact was thin, and the fix is a better fact rather than a louder frame.
 > bears mentioning***
 
 A clause that announces the importance of the sentence it precedes. It postpones
-the subject, spends the reader's attention on packaging, and — because importance
-is asserted rather than demonstrated — usually makes the following claim land
-softer than it would have unannounced.
+the subject, and asserted importance makes the claim land softer than it would
+unannounced.
 
 **Examples**
 
 > The substantive point is that the company's hardest constraints are
 > terrestrially useful.
 
-> Four capabilities follow directly from the crop and are worth stating in the
-> government's own vocabulary.
-
 > It is worth noting that the deadline has already passed.
 
-**Action for the reviewer:** delete the lead-in and start at the subject. This is
-almost always a strict improvement, and it is the cheapest fix in this file.
+> The key thing to understand is that the loop closes without an oxygen import.
+
+**Fix to recommend:** delete the lead-in and start at the subject. This is almost
+always a strict improvement.
 
 - *The substantive point is that the hardest constraints are terrestrially useful.* → *The hardest constraints are terrestrially useful.*
-- *Four capabilities follow directly from the crop and are worth stating in the government's own vocabulary.* → *Four capabilities follow directly from the crop, in the government's own vocabulary.*
+- *The key thing to understand is that the loop closes without an oxygen import.* → *The loop closes without an oxygen import.*
 
 ---
-
-## Sequencing note for the reviewer
-
-Fix meta-commentary before throat-clearing. Meta-sentences frequently exist only
-to introduce a throat-clearing sentence, so removing the first often makes the
-second unnecessary, and cutting them in the other order produces an orphaned
-introduction pointing at nothing.
 
 ## When these constructions are correct
 
