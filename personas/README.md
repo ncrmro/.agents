@@ -19,6 +19,29 @@ resolves a bare name across all three directories, so `engineer.md` here and
 `software-engineer.md` here against `engineer.md` there would silently resolve
 to different documents depending on the working directory.
 
+## Organization personas
+
+Files named `org.*.md` describe an institution rather than a role. They compose:
+pass an organization and a role together and the reviewer adopts one identity
+built from both, in the order given.
+
+```bash
+~/.agents/scripts/persona-review \
+  --persona org.defense-supplier --persona compliance-assessor \
+  --report ~/.agents/local/persona-reviews/dib-assessor.md \
+  'Review the deployment guide and write the report. @README.md'
+```
+
+Use an organization alone when the institution is the whole point, a role alone
+when it is portable across institutions, and both when the same role would reach
+a different conclusion at a different employer — a procurement officer at a
+county and at a defence ministry do not want the same things.
+
+The four `org.*` files here are copies. Their canonical home is the ks.systems
+wiki under `wiki/orgs/`, where they carry frontmatter this tier does not allow;
+these are the same text with the frontmatter stripped. Edit the wiki copy and
+regenerate rather than editing here.
+
 ## Authoring
 
 Use the `persona-authoring` skill rather than writing from scratch; it owns the
