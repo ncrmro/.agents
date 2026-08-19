@@ -5,12 +5,16 @@
 //   snapshot-prompt.py --resolve IMG-03 | submit-web.mjs --site chatgpt --image photo.jpg
 //   submit-web.mjs --site gemini --account you@example.com --prompt-file p.txt --image photo.jpg
 //
-// Chrome runs headed on a dedicated automation profile under
-// $XDG_DATA_HOME/agents/generated-imagery/ — no remote debugging port, so
-// nothing local can drive the signed-in browser between runs. Playwright owns
-// the process: launched per run, closed when the run ends. On a signed-out
-// profile the script holds the window open and waits for you to sign in by
-// hand, then continues.
+// Preferred path: attach to the user's own running Chrome over CDP. Modern
+// Chrome refuses --remote-debugging-port on the default profile, but the
+// consent toggle at chrome://inspect/#remote-debugging opens the endpoint on
+// the current session — the mechanism pi-browser-harness uses. That session is
+// already signed in everywhere, so there is nothing to set up.
+//
+// Fallback when no CDP port answers: a dedicated automation profile under
+// $XDG_DATA_HOME/agents/generated-imagery/, launched headed per run and closed
+// when the run ends. On a signed-out profile the script holds the window open
+// and waits for you to sign in by hand, then continues.
 //
 // The prompt text is inserted verbatim in one CDP call. Nothing here summarises,
 // wraps or edits it.
@@ -78,26 +82,55 @@ try {
   ({ chromium } = require2("playwright-core"));
 }
 
-// ---- launch the automation profile ------------------------------------------
-const bin =
-  process.env.CHROME_BIN ||
-  ["google-chrome", "google-chrome-stable", "chromium"].find((b) => {
-    try { execFileSync("which", [b], { stdio: "ignore" }); return true; }
-    catch { return false; }
-  });
-if (!bin) die("no Chrome binary found (set $CHROME_BIN)");
+// ---- attach to the running Chrome, or launch the automation profile ---------
+async function cdpEndpoint() {
+  const port = Number(process.env.CDP_PORT || 9222);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`, {
+      signal: AbortSignal.timeout(1000),
+    });
+    if (res.ok) return `http://127.0.0.1:${port}`;
+  } catch {}
+  return null;
+}
 
-const context = await chromium.launchPersistentContext(PROFILE, {
-  executablePath: execFileSync("which", [bin]).toString().trim(),
-  headless: false,
-  viewport: null,
-});
+const endpoint = await cdpEndpoint();
+let browser = null; // non-null means attached to the user's own Chrome
+let context = null;
+if (endpoint) {
+  browser = await chromium.connectOverCDP(endpoint);
+  context = browser.contexts()[0];
+  note(`attached to your running Chrome at ${endpoint}`);
+} else {
+  note(
+    "no CDP endpoint on :9222 — falling back to the automation profile. " +
+    "To use your own Chrome: chrome://inspect/#remote-debugging, allow, re-run.",
+  );
+  const bin =
+    process.env.CHROME_BIN ||
+    ["google-chrome", "google-chrome-stable", "chromium"].find((b) => {
+      try { execFileSync("which", [b], { stdio: "ignore" }); return true; }
+      catch { return false; }
+    });
+  if (!bin) die("no Chrome binary found (set $CHROME_BIN)");
+  context = await chromium.launchPersistentContext(PROFILE, {
+    executablePath: execFileSync("which", [bin]).toString().trim(),
+    headless: false,
+    viewport: null,
+  });
+}
 if (opt.check) {
-  process.stdout.write(`ok: launched ${bin} on profile ${PROFILE}\n`);
-  await context.close();
+  process.stdout.write(
+    browser
+      ? `ok: attached to ${browser.version()} at ${endpoint}\n`
+      : `ok: launched the automation profile at ${PROFILE}\n`,
+  );
+  await (browser ? browser.close() : context.close());
   process.exit(0);
 }
-const page = context.pages()[0] ?? (await context.newPage());
+const page = browser
+  ? await context.newPage() // a fresh tab in the user's Chrome
+  : (context.pages()[0] ?? (await context.newPage()));
 page.setDefaultTimeout(30000);
 
 // A signed-out profile is a one-time state: hold the window open and let the
@@ -192,5 +225,7 @@ try {
     .catch(() => {});
   process.stdout.write(page.url() + "\n");
 } finally {
-  await context.close();
+  // Attached: leave the tab open for the share-link step and just disconnect.
+  // Launched: the automation profile's window closes with the run.
+  await (browser ? browser.close() : context.close());
 }
