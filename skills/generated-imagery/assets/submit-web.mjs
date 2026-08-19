@@ -143,12 +143,18 @@ try {
   if (opt.site === "chatgpt") {
     await page.goto("https://chatgpt.com/", { waitUntil: "domcontentloaded" });
     const composer = page.locator("#prompt-textarea");
+    await composer.waitFor({ timeout: 15000 });
+    // ChatGPT shows the composer to anonymous users too, so the composer is no
+    // sign-in proof. An anonymous submit lands outside the account's history
+    // and is unrecoverable — check the profile button instead.
     try {
-      await composer.waitFor({ timeout: 15000 });
+      await page
+        .locator('[data-testid="accounts-profile-button"]')
+        .waitFor({ state: "attached", timeout: 8000 });
     } catch {
       die(
-        "no composer — the automation profile is signed out. " +
-        "Sign in to chatgpt.com in the Chrome window that just opened, then re-run.",
+        "signed out — the composer is the anonymous one. " +
+        "Sign in to chatgpt.com in the automation Chrome window, then re-run.",
       );
     }
     if (opt.images.length)
@@ -159,9 +165,9 @@ try {
     await composer.click();
     await page.keyboard.insertText(prompt);
     // Send stays disabled until every attachment has finished uploading.
+    // click() waits for enabled, which is what a slow upload holds back.
     const send = page.locator("#composer-submit-button");
-    await send.waitFor({ state: "visible", timeout: 180000 });
-    await send.click();
+    await send.click({ timeout: 180000 });
     await awaitCompletion('[data-testid="stop-button"]');
   } else {
     await page.goto(
@@ -196,8 +202,7 @@ try {
     await editor.click();
     await page.keyboard.insertText(prompt);
     const send = page.locator('button[aria-label="Send message"]');
-    await send.waitFor({ state: "visible", timeout: 180000 });
-    await send.click();
+    await send.click({ timeout: 180000 });
     await awaitCompletion('button[aria-label*="Stop"]');
   }
   // The conversation URL only settles once the exchange exists.
