@@ -48,6 +48,14 @@ default browser desktop entry at startup and passes its Chromium-family
 executable to Chrome DevTools MCP. It does not use the browser's persistent
 profile.
 
+**Enable personal Chrome access** — link
+`scripts/chrome-devtools-mcp-personal-xdg` into a directory on `PATH`. Open
+`chrome://inspect/#remote-debugging` in the running XDG default browser and
+enable remote debugging. Run `outfitter run platform-personal`, then approve
+the browser's connection prompt. The `chrome-devtools` tools remain isolated;
+the separate `chrome-personal` tools can access the logged-in profile and its
+open tabs.
+
 ## Upstream sources
 
 - [ai-outfitter/default-profiles](https://github.com/ai-outfitter/default-profiles) — published v1 defaults
