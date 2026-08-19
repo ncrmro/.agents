@@ -216,12 +216,13 @@ resolver, and the text goes through verbatim in one insert:
 snapshot-prompt.py --resolve IMG-03 | submit-web.mjs --site chatgpt --image photo.jpg
 ```
 
-- Chrome 136+ ignores `--remote-debugging-port` on the default profile, so the
-  script keeps a dedicated automation profile under
-  `$XDG_DATA_HOME/agents/generated-imagery/chrome-profile/`. First run opens it
-  signed out: sign in by hand once, re-run. The window stays open between runs
-  and later runs attach in under a second. `--check` verifies the attach path
-  without submitting anything.
+- The script launches a dedicated automation profile
+  (`$XDG_DATA_HOME/agents/generated-imagery/chrome-profile/`) headed, per run,
+  with no remote debugging port — an open CDP port on a signed-in profile is
+  drivable by anything local, and Chrome 136+ forbids the port on the default
+  profile anyway. On a signed-out profile the run holds the window open for up
+  to ten minutes while you sign in by hand, then continues. `--check` verifies
+  the launch path without submitting anything.
 - `--site gemini` requires `--account <email>` (or `$GEMINI_ACCOUNT`) and
   asserts the account chip after navigation. Google's `authuser=` parameter
   fails by silently falling back to the default account, which would put the

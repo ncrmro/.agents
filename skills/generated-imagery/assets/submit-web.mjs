@@ -5,15 +5,16 @@
 //   snapshot-prompt.py --resolve IMG-03 | submit-web.mjs --site chatgpt --image photo.jpg
 //   submit-web.mjs --site gemini --account you@example.com --prompt-file p.txt --image photo.jpg
 //
-// Chrome >=136 ignores --remote-debugging-port on the default profile, so this
-// drives a dedicated automation profile under $XDG_DATA_HOME/agents/generated-imagery/.
-// First run: the window opens signed out — sign in by hand once, re-run. The
-// window is left open between runs; later runs attach to it in under a second.
+// Chrome runs headed on a dedicated automation profile under
+// $XDG_DATA_HOME/agents/generated-imagery/ — no remote debugging port, so
+// nothing local can drive the signed-in browser between runs. Playwright owns
+// the process: launched per run, closed when the run ends. On a signed-out
+// profile the script holds the window open and waits for you to sign in by
+// hand, then continues.
 //
 // The prompt text is inserted verbatim in one CDP call. Nothing here summarises,
 // wraps or edits it.
 
-import { spawn } from "node:child_process";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -25,12 +26,12 @@ const DATA = join(
   "agents/generated-imagery",
 );
 const PROFILE = join(DATA, "chrome-profile");
-const PORT = Number(process.env.CDP_PORT || 9345);
 
 function die(msg) {
   process.stderr.write(`submit-web: ${msg}\n`);
   process.exit(1);
 }
+const note = (m) => process.stderr.write(`submit-web: ${m}\n`);
 
 // ---- args -------------------------------------------------------------------
 const args = process.argv.slice(2);
@@ -70,65 +71,57 @@ let chromium;
 try {
   ({ chromium } = require2("playwright-core"));
 } catch {
-  process.stderr.write("submit-web: installing playwright-core (once)…\n");
+  note("installing playwright-core (once)…");
   execFileSync("npm", ["install", "--prefix", DATA, "playwright-core@^1.50"], {
     stdio: ["ignore", "ignore", "inherit"],
   });
   ({ chromium } = require2("playwright-core"));
 }
 
-// ---- attach to (or launch) the automation Chrome ----------------------------
-async function cdpAlive() {
-  try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/json/version`, {
-      signal: AbortSignal.timeout(1000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+// ---- launch the automation profile ------------------------------------------
+const bin =
+  process.env.CHROME_BIN ||
+  ["google-chrome", "google-chrome-stable", "chromium"].find((b) => {
+    try { execFileSync("which", [b], { stdio: "ignore" }); return true; }
+    catch { return false; }
+  });
+if (!bin) die("no Chrome binary found (set $CHROME_BIN)");
 
-if (!(await cdpAlive())) {
-  const bin =
-    process.env.CHROME_BIN ||
-    ["google-chrome", "google-chrome-stable", "chromium"].find((b) => {
-      try { execFileSync("which", [b], { stdio: "ignore" }); return true; }
-      catch { return false; }
-    });
-  if (!bin) die("no Chrome binary found (set $CHROME_BIN)");
-  spawn(
-    bin,
-    [
-      `--user-data-dir=${PROFILE}`,
-      `--remote-debugging-port=${PORT}`,
-      "--no-first-run",
-      "--no-default-browser-check",
-    ],
-    { detached: true, stdio: "ignore" },
-  ).unref();
-  const t0 = Date.now();
-  while (!(await cdpAlive())) {
-    if (Date.now() - t0 > 20000) die("Chrome did not open its debug port");
-    await new Promise((r) => setTimeout(r, 300));
-  }
-}
-
-const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
+const context = await chromium.launchPersistentContext(PROFILE, {
+  executablePath: execFileSync("which", [bin]).toString().trim(),
+  headless: false,
+  viewport: null,
+});
 if (opt.check) {
-  process.stdout.write(`ok: attached to ${browser.version()} on port ${PORT}\n`);
-  await browser.close();
+  process.stdout.write(`ok: launched ${bin} on profile ${PROFILE}\n`);
+  await context.close();
   process.exit(0);
 }
-const context = browser.contexts()[0];
-const page = await context.newPage();
+const page = context.pages()[0] ?? (await context.newPage());
 page.setDefaultTimeout(30000);
 
-const note = (m) => process.stderr.write(`submit-web: ${m}\n`);
+// A signed-out profile is a one-time state: hold the window open and let the
+// signed-in marker appear whenever the sign-in (done by hand) completes.
+async function signedInOrWait(marker, what) {
+  const found = await marker
+    .waitFor({ state: "attached", timeout: 8000 })
+    .then(() => true, () => false);
+  if (found) return;
+  note(`signed out — sign in to ${what} in this window; waiting up to 10 min…`);
+  await marker
+    .waitFor({ state: "attached", timeout: 600000 })
+    .catch(() => die(`still signed out of ${what} after 10 min`));
+  note("signed in, continuing");
+}
 
 // Wait for a streaming indicator to appear (grace period), then disappear.
 async function awaitCompletion(stopSel) {
-  if (!opt.wait) return;
+  if (!opt.wait) {
+    // The submit is client-side until the request is fully away; give it a beat
+    // before the context (and browser) closes.
+    await page.waitForTimeout(5000);
+    return;
+  }
   note("waiting for the response to finish…");
   try {
     await page.waitForSelector(stopSel, { state: "visible", timeout: 20000 });
@@ -143,20 +136,14 @@ try {
   if (opt.site === "chatgpt") {
     await page.goto("https://chatgpt.com/", { waitUntil: "domcontentloaded" });
     const composer = page.locator("#prompt-textarea");
-    await composer.waitFor({ timeout: 15000 });
+    await composer.waitFor({ timeout: 20000 });
     // ChatGPT shows the composer to anonymous users too, so the composer is no
     // sign-in proof. An anonymous submit lands outside the account's history
     // and is unrecoverable — check the profile button instead.
-    try {
-      await page
-        .locator('[data-testid="accounts-profile-button"]')
-        .waitFor({ state: "attached", timeout: 8000 });
-    } catch {
-      die(
-        "signed out — the composer is the anonymous one. " +
-        "Sign in to chatgpt.com in the automation Chrome window, then re-run.",
-      );
-    }
+    await signedInOrWait(
+      page.locator('[data-testid="accounts-profile-button"]'),
+      "chatgpt.com",
+    );
     if (opt.images.length)
       await page
         .locator('form input[type="file"]')
@@ -164,25 +151,18 @@ try {
         .setInputFiles(opt.images);
     await composer.click();
     await page.keyboard.insertText(prompt);
-    // Send stays disabled until every attachment has finished uploading.
     // click() waits for enabled, which is what a slow upload holds back.
-    const send = page.locator("#composer-submit-button");
-    await send.click({ timeout: 180000 });
+    await page.locator("#composer-submit-button").click({ timeout: 180000 });
     await awaitCompletion('[data-testid="stop-button"]');
   } else {
     await page.goto(
       `https://gemini.google.com/app?authuser=${encodeURIComponent(opt.account)}`,
       { waitUntil: "domcontentloaded" },
     );
-    const editor = page.locator("rich-textarea div.ql-editor");
-    try {
-      await editor.waitFor({ timeout: 15000 });
-    } catch {
-      die(
-        "no composer — the automation profile is signed out of Google. " +
-        "Sign in in the Chrome window that just opened, then re-run.",
-      );
-    }
+    await signedInOrWait(
+      page.locator("rich-textarea div.ql-editor"),
+      `Google (${opt.account})`,
+    );
     // Assert the account, loudly: the failure mode of authuser is the prompt
     // landing in the default account's history without a word said.
     const chip = await page
@@ -199,10 +179,11 @@ try {
       await input.setInputFiles(opt.images);
       await page.keyboard.press("Escape");
     }
-    await editor.click();
+    await page.locator("rich-textarea div.ql-editor").click();
     await page.keyboard.insertText(prompt);
-    const send = page.locator('button[aria-label="Send message"]');
-    await send.click({ timeout: 180000 });
+    await page
+      .locator('button[aria-label="Send message"]')
+      .click({ timeout: 180000 });
     await awaitCompletion('button[aria-label*="Stop"]');
   }
   // The conversation URL only settles once the exchange exists.
@@ -211,5 +192,5 @@ try {
     .catch(() => {});
   process.stdout.write(page.url() + "\n");
 } finally {
-  await browser.close(); // disconnects; the Chrome window and the page stay open
+  await context.close();
 }
