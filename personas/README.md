@@ -36,10 +36,15 @@ at launch, so it becomes that session's identity rather than a request in the
 conversation. Because the path is absolute, this works from any directory:
 
 ```bash
-outfitter run persona-reviewer -- \
-  --append-system-prompt ~/.agents/personas/platform-engineer.md \
+outfitter run persona-reviewer \
+  --append-prompt ~/.agents/personas/platform-engineer.md -- \
   --print "Review the onboarding docs from this persona's point of view."
 ```
+
+`--append-prompt` goes before `--`, never after it. A harness flag written
+after `--` reaches the harness verbatim, and the harnesses disagree about what
+it means: pi reads a path, Claude Code reads a prompt string. The wrong one
+produces a generic review with no persona and no error.
 
 The `persona-review` skill wraps the same call and owns the review method,
 evidence gathering, and report shape. Its launcher takes a bare role name and
@@ -47,11 +52,15 @@ searches `./docs/personas/`, then `./.agents/personas/`, then this directory —
 so a project persona shadows a cross-project one of the same name:
 
 ```bash
-bash scripts/persona-review.sh \
+~/.agents/scripts/persona-review \
   --persona platform-engineer \
-  --report reports/platform-engineer-docs.md \
-  -- --print "Review the onboarding docs and write the report. @README.md"
+  --report ~/.agents/local/persona-reviews/platform-engineer-docs.md \
+  'Review the onboarding docs and write the report. @README.md'
 ```
+
+The prompt is one positional argument, and the report's parent directory must
+already exist. Repeat `--persona` to run several, each in its own process with
+its own session and report.
 
 Both skills and the `persona-reviewer` agent resolve from
 `ai-outfitter/community-profiles`, pinned in `settings.yml`.
