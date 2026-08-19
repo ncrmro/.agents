@@ -1,6 +1,6 @@
 ---
 name: prose-reviewer
-description: Review and clean up (user-facing) prose.
+description: Review and clean up user-facing prose by fanning out parallel read-only reviewer agents, then applying the merged fixes in one pass. Use for docs, READMEs, blog posts, announcements, white papers, changelogs, or UI strings — hunting AI-writing tells (inflated significance, AI vocabulary, formatting artifacts, duplication) and the writer commenting on their own writing (meta-commentary, declared honesty, throat-clearing lead-ins).
 ---
 
 # Prose reviewer
@@ -18,10 +18,29 @@ field guide to AI-writing tells, split into one cleaned file per reviewer lens:
   inline-header lists, table misuse, curly quotes.
 - `references/communication-tells.md` — chat remnants, knowledge-cutoff
   disclaimers, placeholders, model-specific citation artifacts.
+- `references/self-reference-tells.md` — **not from the Wikipedia guide.** The
+  document narrating its own structure, announcing its own honesty, or clearing
+  its throat before a point. These survived a full four-lens review of an
+  assistant-drafted document, which is why they get their own file.
 - `references/signs-of-ai-writing.md` — the full vendored guide the above are
   derived from; read only when a finding needs the original context.
 
-## The trap: masking tells instead of fixing prose
+## The two traps
+
+### Trap 1: the writer commenting on the writing
+
+Three patterns get past every lens that hunts for vocabulary, because the words
+themselves are ordinary: a sentence that describes where it sits in the document,
+one that announces its own honesty, and one that announces the importance of the
+sentence after it. All three are the writer standing beside the point instead of
+making it, and multi-pass editing *adds* them, because each pass writes
+connective tissue to justify what the last pass left behind.
+
+`references/self-reference-tells.md` has the words to watch, worked rewrites, and
+the single test that decides all three: **does the sentence tell the reader
+something about the subject, or only about the writing?**
+
+### Trap 2: masking tells instead of fixing prose
 
 The guide's own warning applies here: the listed patterns are *signs* of shallow
 writing, not the problem itself. Deleting every em dash and "moreover" while
@@ -55,8 +74,8 @@ keeps one voice in the final pass.
 
 | Lens | Reads | Hunts |
 | --- | --- | --- |
-| Content & substance | `references/content-tells.md` | Significance inflation ("stands as a testament"), puffery, vague attributions ("industry reports suggest"), superficial analysis, formulaic "challenges and future prospects" conclusions. |
-| Language & succinctness | `references/language-tells.md` | AI vocabulary ("delve", "showcase", "boasts", "vibrant"), copula avoidance ("serves as" for "is"), negative parallelisms ("not just X, but Y"), rule-of-three padding, elegant variation — plus plain wordiness: filler transitions, hedging, redundant qualifiers, sentences that say nothing, headers for two-sentence sections. |
+| Content & substance | `references/content-tells.md` + `references/self-reference-tells.md` | Significance inflation ("stands as a testament"), puffery, vague attributions ("industry reports suggest"), superficial analysis, formulaic "challenges and future prospects" conclusions — plus meta-commentary ("this is the clearest alignment in the document") and authenticity qualifiers ("the honest statement", "that is the whole of it"). |
+| Language & succinctness | `references/language-tells.md` | AI vocabulary ("delve", "showcase", "boasts", "vibrant"), copula avoidance ("serves as" for "is"), negative parallelisms ("not just X, but Y"), rule-of-three padding, elegant variation — plus plain wordiness: filler transitions, hedging, redundant qualifiers, sentences that say nothing, headers for two-sentence sections, and throat-clearing lead-ins ("the substantive point is that…", "it is worth noting that…"; see `references/self-reference-tells.md` §3). |
 | Style & remnants | `references/style-tells.md` + `references/communication-tells.md` | Title case headings, boldface/em-dash/emoji overuse, inline-header lists, chat leakage ("I hope this helps"), placeholders, leftover machine artifacts. |
 | Duplication & voice | nothing — reads *all* target files whole | The same point stated more than once: intro/body/conclusion echoes, a summary restating what was just said, the same fact or pitch explained in two files, parallel sections that could merge. Also tone/terminology drift against the project's existing prose, audience fit, claims the project itself doesn't support. |
 
