@@ -22,8 +22,11 @@ default_agent: founder
 default_harness: pi
 sources:
   - github: ai-outfitter/community-profiles
-    # Bake the Chrome DevTools MCP candidate before a community release.
-    ref: 53ca7074ec366969f9cb1552bf3f79cbaf121dda
+    # main after PR #46 (scaling by composition; environment.repos needs
+    # outfitter >= 1.9.0). The Chrome DevTools MCP candidate this previously
+    # pinned is now community-profiles PR #51; bump to the release that
+    # includes it when it merges.
+    ref: ca4c50aa1cbb8206610f1d5e9e5d2415278be735
   - github: ai-outfitter/default-profiles
     # This release supplies founder and pins its reviewed community catalog.
     ref: v1.1.1
