@@ -1,20 +1,16 @@
 #!/usr/bin/env node
 // Submit a resolved prompt (stdin or --prompt-file), plus optional images, to a
-// web image model in a real Chrome window, and print the conversation URL.
+// web image model in the user's own Chrome, and print the conversation URL.
 //
 //   snapshot-prompt.py --resolve IMG-03 | submit-web.mjs --site chatgpt --image photo.jpg
 //   submit-web.mjs --site gemini --account you@example.com --prompt-file p.txt --image photo.jpg
 //
-// Preferred path: attach to the user's own running Chrome over CDP. Modern
-// Chrome refuses --remote-debugging-port on the default profile, but the
-// consent toggle at chrome://inspect/#remote-debugging opens the endpoint on
-// the current session — the mechanism pi-browser-harness uses. That session is
-// already signed in everywhere, so there is nothing to set up.
-//
-// Fallback when no CDP port answers: a dedicated automation profile under
-// $XDG_DATA_HOME/agents/generated-imagery/, launched headed per run and closed
-// when the run ends. On a signed-out profile the script holds the window open
-// and waits for you to sign in by hand, then continues.
+// The script attaches over CDP to the running, signed-in Chrome session. The
+// user enables that once via the consent toggle at
+// chrome://inspect/#remote-debugging, which opens the endpoint on the current
+// session (the --remote-debugging-port flag is refused on the default profile
+// in modern Chrome). Each run opens a fresh tab, submits there, and leaves the
+// tab open on disconnect.
 //
 // The prompt text is inserted verbatim in one CDP call. Nothing here summarises,
 // wraps or edits it.
@@ -29,7 +25,6 @@ const DATA = join(
   process.env.XDG_DATA_HOME || join(process.env.HOME, ".local/share"),
   "agents/generated-imagery",
 );
-const PROFILE = join(DATA, "chrome-profile");
 
 function die(msg) {
   process.stderr.write(`submit-web: ${msg}\n`);
@@ -82,76 +77,35 @@ try {
   ({ chromium } = require2("playwright-core"));
 }
 
-// ---- attach to the running Chrome, or launch the automation profile ---------
-async function cdpEndpoint() {
-  const port = Number(process.env.CDP_PORT || 9222);
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/json/version`, {
-      signal: AbortSignal.timeout(1000),
-    });
-    if (res.ok) return `http://127.0.0.1:${port}`;
-  } catch {}
-  return null;
-}
-
-const endpoint = await cdpEndpoint();
-let browser = null; // non-null means attached to the user's own Chrome
-let context = null;
-if (endpoint) {
-  browser = await chromium.connectOverCDP(endpoint);
-  context = browser.contexts()[0];
-  note(`attached to your running Chrome at ${endpoint}`);
-} else {
-  note(
-    "no CDP endpoint on :9222 — falling back to the automation profile. " +
-    "To use your own Chrome: chrome://inspect/#remote-debugging, allow, re-run.",
-  );
-  const bin =
-    process.env.CHROME_BIN ||
-    ["google-chrome", "google-chrome-stable", "chromium"].find((b) => {
-      try { execFileSync("which", [b], { stdio: "ignore" }); return true; }
-      catch { return false; }
-    });
-  if (!bin) die("no Chrome binary found (set $CHROME_BIN)");
-  context = await chromium.launchPersistentContext(PROFILE, {
-    executablePath: execFileSync("which", [bin]).toString().trim(),
-    headless: false,
-    viewport: null,
+// ---- attach to the running Chrome -------------------------------------------
+const port = Number(process.env.CDP_PORT || 9222);
+const endpoint = `http://127.0.0.1:${port}`;
+try {
+  const res = await fetch(`${endpoint}/json/version`, {
+    signal: AbortSignal.timeout(1500),
   });
-}
-if (opt.check) {
-  process.stdout.write(
-    browser
-      ? `ok: attached to ${browser.version()} at ${endpoint}\n`
-      : `ok: launched the automation profile at ${PROFILE}\n`,
+  if (!res.ok) throw new Error();
+} catch {
+  die(
+    `no Chrome debug endpoint on :${port}. Enable it once in the Chrome you ` +
+    "are signed into: open chrome://inspect/#remote-debugging and allow it, " +
+    "then re-run. ($CDP_PORT overrides the port.)",
   );
-  await (browser ? browser.close() : context.close());
+}
+const browser = await chromium.connectOverCDP(endpoint);
+if (opt.check) {
+  process.stdout.write(`ok: attached to ${browser.version()} at ${endpoint}\n`);
+  await browser.close();
   process.exit(0);
 }
-const page = browser
-  ? await context.newPage() // a fresh tab in the user's Chrome
-  : (context.pages()[0] ?? (await context.newPage()));
+const page = await browser.contexts()[0].newPage();
 page.setDefaultTimeout(30000);
-
-// A signed-out profile is a one-time state: hold the window open and let the
-// signed-in marker appear whenever the sign-in (done by hand) completes.
-async function signedInOrWait(marker, what) {
-  const found = await marker
-    .waitFor({ state: "attached", timeout: 8000 })
-    .then(() => true, () => false);
-  if (found) return;
-  note(`signed out — sign in to ${what} in this window; waiting up to 10 min…`);
-  await marker
-    .waitFor({ state: "attached", timeout: 600000 })
-    .catch(() => die(`still signed out of ${what} after 10 min`));
-  note("signed in, continuing");
-}
 
 // Wait for a streaming indicator to appear (grace period), then disappear.
 async function awaitCompletion(stopSel) {
   if (!opt.wait) {
-    // The submit is client-side until the request is fully away; give it a beat
-    // before the context (and browser) closes.
+    // The submit is client-side until the request is fully away; give it a
+    // beat before disconnecting.
     await page.waitForTimeout(5000);
     return;
   }
@@ -173,10 +127,10 @@ try {
     // ChatGPT shows the composer to anonymous users too, so the composer is no
     // sign-in proof. An anonymous submit lands outside the account's history
     // and is unrecoverable — check the profile button instead.
-    await signedInOrWait(
-      page.locator('[data-testid="accounts-profile-button"]'),
-      "chatgpt.com",
-    );
+    await page
+      .locator('[data-testid="accounts-profile-button"]')
+      .waitFor({ state: "attached", timeout: 8000 })
+      .catch(() => die("this Chrome is signed out of chatgpt.com"));
     if (opt.images.length)
       await page
         .locator('form input[type="file"]')
@@ -192,10 +146,10 @@ try {
       `https://gemini.google.com/app?authuser=${encodeURIComponent(opt.account)}`,
       { waitUntil: "domcontentloaded" },
     );
-    await signedInOrWait(
-      page.locator("rich-textarea div.ql-editor"),
-      `Google (${opt.account})`,
-    );
+    await page
+      .locator("rich-textarea div.ql-editor")
+      .waitFor({ timeout: 20000 })
+      .catch(() => die(`this Chrome is signed out of Google (${opt.account})`));
     // Assert the account, loudly: the failure mode of authuser is the prompt
     // landing in the default account's history without a word said.
     const chip = await page
@@ -225,7 +179,6 @@ try {
     .catch(() => {});
   process.stdout.write(page.url() + "\n");
 } finally {
-  // Attached: leave the tab open for the share-link step and just disconnect.
-  // Launched: the automation profile's window closes with the run.
-  await (browser ? browser.close() : context.close());
+  // Disconnect only: the tab stays open for the share-link step.
+  await browser.close();
 }
