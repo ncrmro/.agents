@@ -16,6 +16,7 @@ a prompt. The craft rules below improve one image too.
 | `snapshot-prompt.py --resolve <id>` | Prints the whole tree as one document, ready to send. Writes nothing. |
 | `generate.sh <id> <count>` | Snapshots, then runs one backend call per variant in parallel, each passing the resolved text verbatim in its own empty directory, and appends provenance. |
 | `check-prompts.sh` | Flags the prose habits an image model cannot act on, plus unreferenced fragments. |
+| `submit-web.mjs --site chatgpt\|gemini [--image f]…` | Pastes a resolved prompt (stdin or `--prompt-file`), attaches images, submits in a real Chrome window, waits, prints the conversation URL. |
 
 All take the image set directory from `IMAGESET_ROOT` (default: the current
 directory). `generate.sh` isolates the backend into one marked function; the
@@ -204,6 +205,36 @@ because a harness was already there.
 
 This is the closing form of the rule: shrink the agent's job to the thing no
 script can do. Here that turns out to be nothing at all.
+
+## Submitting to a web model
+
+Where no API is available — or the strongest renders come from a subscription
+web model — `submit-web.mjs` drives the site itself. It composes with the
+resolver, and the text goes through verbatim in one insert:
+
+```
+snapshot-prompt.py --resolve IMG-03 | submit-web.mjs --site chatgpt --image photo.jpg
+```
+
+- Chrome 136+ ignores `--remote-debugging-port` on the default profile, so the
+  script keeps a dedicated automation profile under
+  `$XDG_DATA_HOME/agents/generated-imagery/chrome-profile/`. First run opens it
+  signed out: sign in by hand once, re-run. The window stays open between runs
+  and later runs attach in under a second. `--check` verifies the attach path
+  without submitting anything.
+- `--site gemini` requires `--account <email>` (or `$GEMINI_ACCOUNT`) and
+  asserts the account chip after navigation. Google's `authuser=` parameter
+  fails by silently falling back to the default account, which would put the
+  prompt in the wrong account's history — so a mismatch is a hard error, not a
+  warning.
+- The conversation URL it prints is what an import step consumes; creating a
+  share link stays manual.
+- Selectors were read from the live DOM (2026-08-19): ChatGPT
+  `#prompt-textarea` / `#composer-submit-button` / `[data-testid="stop-button"]`,
+  Gemini `rich-textarea div.ql-editor` / `button[aria-label="Send message"]`,
+  and Gemini's `input[type=file]` exists only while the "Upload & tools" menu
+  is open. When a site ships a redesign, re-read the DOM before rewriting the
+  script's logic.
 
 ## Workflow
 
