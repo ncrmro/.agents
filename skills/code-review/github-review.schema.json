@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Request body for POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews. Severity and reasoning belong in each comment body because GitHub has no severity property.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commit_id",
+    "body",
+    "event",
+    "comments"
+  ],
+  "properties": {
+    "commit_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$"
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event": {
+      "type": "string",
+      "enum": [
+        "APPROVE",
+        "REQUEST_CHANGES"
+      ]
+    },
+    "comments": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "line",
+          "side",
+          "body"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "LEFT",
+              "RIGHT"
+            ]
+          },
+          "start_line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "start_side": {
+            "type": "string",
+            "enum": [
+              "LEFT",
+              "RIGHT"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\[P[0-3]\\] .+"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "start_line"
+              ]
+            },
+            "then": {
+              "required": [
+                "start_side"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "start_side"
+              ]
+            },
+            "then": {
+              "required": [
+                "start_line"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "REQUEST_CHANGES"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "comments": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}
